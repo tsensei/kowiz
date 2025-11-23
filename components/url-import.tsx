@@ -4,8 +4,9 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { Link2, Youtube, ExternalLink, Loader2 } from 'lucide-react';
+import { Link2, Youtube, ExternalLink, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface UrlImportProps {
   onImportSuccess: () => void;
@@ -68,6 +69,15 @@ export function UrlImport({ onImportSuccess }: UrlImportProps) {
               <p className="text-sm text-muted-foreground mb-4">
                 Paste a URL from YouTube, Vimeo, Instagram, TikTok, Twitch, or direct media link
               </p>
+              
+              <Alert className="mb-4 border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/20">
+                <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-500" />
+                <AlertDescription className="text-xs text-amber-800 dark:text-amber-300">
+                  <strong>Note:</strong> URL imports can be unreliable due to platform restrictions, 
+                  bot detection, and rate limiting. Some platforms may block automated downloads or 
+                  require authentication. If a download fails, try again later or use direct file upload instead.
+                </AlertDescription>
+              </Alert>
               
               <div className="flex gap-2">
                 <Input

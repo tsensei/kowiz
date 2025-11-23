@@ -33,9 +33,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libimage-exiftool-perl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install yt-dlp
-RUN pip3 install --no-cache-dir yt-dlp --break-system-packages || \
-    pip3 install --no-cache-dir yt-dlp
+# Install yt-dlp (always get latest version for best YouTube support)
+RUN pip3 install --no-cache-dir --upgrade yt-dlp --break-system-packages || \
+    pip3 install --no-cache-dir --upgrade yt-dlp
 
 WORKDIR /app
 
@@ -80,9 +80,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libimage-exiftool-perl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install yt-dlp
-RUN pip3 install --no-cache-dir yt-dlp --break-system-packages || \
-    pip3 install --no-cache-dir yt-dlp
+# Install yt-dlp (always get latest version for best YouTube support)
+RUN pip3 install --no-cache-dir --upgrade yt-dlp --break-system-packages || \
+    pip3 install --no-cache-dir --upgrade yt-dlp
 
 # Verify installations and codec support
 RUN echo "=== Verifying Tools ===" && \
