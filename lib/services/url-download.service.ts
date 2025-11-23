@@ -81,8 +81,10 @@ export class UrlDownloadService {
       const metadata = JSON.parse(infoJson);
       console.log(`✓ Found: ${metadata.title} by ${metadata.uploader || 'Unknown'}`);
       
-      // Download the video in best available quality
-      const outputTemplate = path.join(path.dirname(outputPath), '%(title)s.%(ext)s');
+      // Use a safe, short filename to avoid filesystem length limits
+      // We'll use the outputPath directly instead of a template
+      const tempFileName = path.basename(outputPath, path.extname(outputPath));
+      const outputTemplate = path.join(path.dirname(outputPath), `${tempFileName}.%(ext)s`);
       
       const downloadCommand = `yt-dlp \
         --format "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" \
@@ -98,23 +100,28 @@ export class UrlDownloadService {
         timeout: 600000, // 10 minute timeout
       });
       
-      // Find the downloaded file
-      const downloadedFile = await this.findDownloadedFile(path.dirname(outputPath), metadata.title);
+      // Find the downloaded file (should match our template)
+      const downloadedFile = await this.findDownloadedFile(path.dirname(outputPath), tempFileName);
       
       if (!downloadedFile) {
         throw new Error('Downloaded file not found');
       }
       
-      // Move to expected output path
-      await fs.rename(downloadedFile, outputPath);
+      // Rename to final output path if needed
+      if (downloadedFile !== outputPath) {
+        await fs.rename(downloadedFile, outputPath);
+      }
       
       const stats = await fs.stat(outputPath);
+      
+      // Use a cleaned version of the title for the filename
+      const cleanTitle = this.sanitizeFileName(metadata.title);
       
       return {
         success: true,
         filePath: outputPath,
         fileSize: stats.size,
-        fileName: metadata.title,
+        fileName: cleanTitle,
         format: metadata.ext || 'mp4',
         metadata: {
           title: metadata.title,
@@ -208,7 +215,23 @@ export class UrlDownloadService {
   getTempPath(filename: string): string {
     return path.join(this.tempDir, filename);
   }
+
+  /**
+   * Sanitize filename to safe length and characters
+   */
+  private sanitizeFileName(title: string): string {
+    // Remove special characters and limit length
+    const sanitized = title
+      .replace(/[^\w\s-]/g, '') // Remove special chars
+      .replace(/\s+/g, '-')     // Replace spaces with hyphens
+      .replace(/-+/g, '-')      // Remove duplicate hyphens
+      .substring(0, 100);       // Limit to 100 characters
+    
+    return sanitized || 'video';
+  }
 }
+
+export const urlDownloadService = new UrlDownloadService();
 
 export const urlDownloadService = new UrlDownloadService();
 
