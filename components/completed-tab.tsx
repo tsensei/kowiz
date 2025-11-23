@@ -26,14 +26,10 @@ export function CompletedTab({ files }: CompletedTabProps) {
     try {
       setDownloading(`${fileId}-${type}`);
       
-      const response = await fetch(`/api/files/${fileId}/download?type=${type}`);
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to get download URL');
-      }
-
-      window.open(data.downloadUrl, '_blank');
+      // Open download endpoint directly - it will stream the file
+      const downloadUrl = `/api/files/${fileId}/download?type=${type}`;
+      window.open(downloadUrl, '_blank');
+      
       toast.success(`Downloading ${type} file...`);
     } catch (error) {
       console.error('Download error:', error);

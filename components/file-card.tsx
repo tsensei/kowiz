@@ -53,15 +53,9 @@ export function FileCard({ file, onRetry }: FileCardProps) {
     try {
       setDownloading(type);
       
-      const response = await fetch(`/api/files/${file.id}/download?type=${type}`);
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to get download URL');
-      }
-
-      // Open download URL in new tab
-      window.open(data.downloadUrl, '_blank');
+      // Open download endpoint directly - it will stream the file
+      const downloadUrl = `/api/files/${file.id}/download?type=${type}`;
+      window.open(downloadUrl, '_blank');
       
       toast.success(`Downloading ${type} file...`);
     } catch (error) {

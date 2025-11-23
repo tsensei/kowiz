@@ -18,17 +18,17 @@ export async function GET(
       return NextResponse.json({ error: 'File not found' }, { status: 404 });
     }
 
-    let downloadUrl: string;
     let fileName: string;
+    let contentType: string;
+    let bucketName: string;
+    let filePath: string;
 
     if (type === 'raw') {
       // Download raw/original file
-      downloadUrl = await minioService.getFileUrl(
-        BUCKETS.RAW_FILES,
-        file.rawFilePath,
-        3600 // 1 hour expiry
-      );
+      bucketName = BUCKETS.RAW_FILES;
+      filePath = file.rawFilePath;
       fileName = file.name;
+      contentType = file.mimeType;
     } else {
       // Download converted file
       if (!file.processedFilePath) {
@@ -38,30 +38,71 @@ export async function GET(
         );
       }
 
-      downloadUrl = await minioService.getFileUrl(
-        BUCKETS.PROCESSED_FILES,
-        file.processedFilePath,
-        3600 // 1 hour expiry
-      );
+      bucketName = BUCKETS.PROCESSED_FILES;
+      filePath = file.processedFilePath;
       
       // Create filename with new extension
       const nameParts = file.name.split('.');
       nameParts[nameParts.length - 1] = file.targetFormat || file.originalFormat;
       fileName = nameParts.join('.');
+      
+      // Determine content type based on target format
+      const format = file.targetFormat || file.originalFormat;
+      contentType = getContentType(format);
     }
 
-    return NextResponse.json({
-      success: true,
-      downloadUrl,
-      fileName,
-      expiresIn: 3600,
+    // Get file stream from MinIO
+    const fileStream = await minioService.getFileStream(bucketName, filePath);
+
+    // Convert Node.js stream to Web ReadableStream
+    const webStream = new ReadableStream({
+      async start(controller) {
+        try {
+          fileStream.on('data', (chunk: Buffer) => {
+            controller.enqueue(new Uint8Array(chunk));
+          });
+          fileStream.on('end', () => {
+            controller.close();
+          });
+          fileStream.on('error', (error: Error) => {
+            controller.error(error);
+          });
+        } catch (error) {
+          controller.error(error);
+        }
+      },
+    });
+
+    // Return file as stream with proper headers
+    return new NextResponse(webStream, {
+      headers: {
+        'Content-Type': contentType,
+        'Content-Disposition': `attachment; filename="${encodeURIComponent(fileName)}"`,
+      },
     });
   } catch (error) {
-    console.error('Download URL generation error:', error);
+    console.error('Download error:', error);
     return NextResponse.json(
-      { error: 'Failed to generate download URL' },
+      { error: 'Failed to download file' },
       { status: 500 }
     );
   }
+}
+
+function getContentType(format: string): string {
+  const formatLower = format.toLowerCase();
+  const contentTypes: Record<string, string> = {
+    jpeg: 'image/jpeg',
+    jpg: 'image/jpeg',
+    png: 'image/png',
+    gif: 'image/gif',
+    webp: 'image/webp',
+    webm: 'video/webm',
+    mp4: 'video/mp4',
+    ogg: 'audio/ogg',
+    mp3: 'audio/mpeg',
+    wav: 'audio/wav',
+  };
+  return contentTypes[formatLower] || 'application/octet-stream';
 }
 

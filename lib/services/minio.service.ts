@@ -40,6 +40,10 @@ export class MinioService {
     });
   }
 
+  async getFileStream(bucketName: string, fileName: string): Promise<NodeJS.ReadableStream> {
+    return await this.client.getObject(bucketName, fileName);
+  }
+
   async deleteFile(bucketName: string, fileName: string): Promise<void> {
     await this.client.removeObject(bucketName, fileName);
   }
