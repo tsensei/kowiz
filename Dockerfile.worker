@@ -6,6 +6,9 @@ FROM base AS deps
 RUN apk add --no-cache \
     ffmpeg \
     imagemagick \
+    imagemagick-heic \
+    libheif \
+    libheif-tools \
     python3 \
     py3-pip \
     curl \
@@ -35,6 +38,9 @@ ENV NODE_ENV=production
 RUN apk add --no-cache \
     ffmpeg \
     imagemagick \
+    imagemagick-heic \
+    libheif \
+    libheif-tools \
     python3 \
     py3-pip \
     curl
@@ -45,7 +51,8 @@ RUN pip3 install --no-cache-dir yt-dlp --break-system-packages
 # Verify installations
 RUN ffmpeg -version && \
     yt-dlp --version && \
-    convert -version
+    convert -version && \
+    convert -list format | grep -i heic || echo "HEIC support check"
 
 # Enable pnpm BEFORE creating user (needs root)
 RUN corepack enable && corepack prepare pnpm@latest --activate
