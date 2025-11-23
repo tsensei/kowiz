@@ -21,12 +21,27 @@ async function processConversionJob(jobs: Job<ConversionJobData>[]) {
     console.log(`File ID: ${fileId}`);
     console.log(`File Name: ${fileName}`);
     console.log(`MIME Type: ${mimeType}`);
+    if ('attemptsmade' in job) {
+      console.log(`Attempt: ${(job as any).attemptsmade + 1}`);
+    }
 
     try {
       // Get file details from database
       const fileRecord = await databaseService.getFileById(fileId);
       if (!fileRecord) {
         throw new Error(`File record not found: ${fileId}`);
+      }
+
+      // Check if we've exceeded retry limit
+      const retryCount = fileRecord.retryCount || 0;
+      const maxRetries = 3;
+      
+      if (retryCount >= maxRetries) {
+        const errorMessage = `Maximum retry attempts (${maxRetries}) reached. Last error: ${fileRecord.errorMessage || 'Unknown error'}`;
+        console.error(`❌ Retry limit exceeded (${retryCount}/${maxRetries}):`, errorMessage);
+        await databaseService.updateFileStatus(fileId, 'failed', errorMessage);
+        // Don't throw error - just return to prevent pg-boss from retrying
+        return { success: false, fileId, error: errorMessage };
       }
 
       console.log(`Category: ${fileRecord.category}`);
@@ -173,13 +188,29 @@ async function processConversionJob(jobs: Job<ConversionJobData>[]) {
       console.error('❌ Error processing job:', error);
       
       const errorMessage = error instanceof Error ? error.message : 'Unknown conversion error';
-      await databaseService.updateFileStatus(fileId, 'failed', errorMessage);
-      await databaseService.incrementRetryCount(fileId);
       
-      console.log('=================================\n');
+      // Increment retry count
+      const updatedFile = await databaseService.incrementRetryCount(fileId);
+      const newRetryCount = updatedFile?.retryCount || 0;
+      const maxRetries = 3;
       
-      // pg-boss automatically retries when error is thrown
-      throw error;
+      // Update status with error
+      if (newRetryCount >= maxRetries) {
+        // Final failure - exceeded retry limit
+        const finalErrorMessage = `Failed after ${maxRetries} attempts: ${errorMessage}`;
+        await databaseService.updateFileStatus(fileId, 'failed', finalErrorMessage);
+        console.error(`❌ Maximum retry attempts (${maxRetries}) reached. Marking as permanently failed.`);
+        console.log('=================================\n');
+        // Don't throw - let pg-boss mark job as failed
+        return { success: false, fileId, error: finalErrorMessage };
+      } else {
+        // Still have retries left
+        await databaseService.updateFileStatus(fileId, 'failed', errorMessage);
+        console.log(`⚠️  Retry ${newRetryCount}/${maxRetries} - will retry automatically`);
+        console.log('=================================\n');
+        // Throw error to trigger pg-boss retry
+        throw error;
+      }
     }
   }
 }
