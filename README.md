@@ -670,13 +670,34 @@ Contributions welcome! Please ensure:
 - Add tests for new features
 - Update documentation
 
+## 📚 Documentation
+
+- **[README.md](./README.md)** - This file (quick start and overview)
+- **[DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)** - Complete deployment instructions
+- **[GITHUB_SECRETS_SETUP.md](./GITHUB_SECRETS_SETUP.md)** - GitHub Actions configuration
+
+## 🏗️ Deployment Files
+
+```
+├── Dockerfile                    # Next.js web app
+├── Dockerfile.worker             # Background worker with FFmpeg
+├── docker-compose.yml            # Development setup
+├── docker-compose.local.yml      # Local end-to-end testing
+├── docker-compose.prod.yml       # Production (Coolify)
+├── .github/workflows/
+│   └── build-and-push.yml        # CI/CD pipeline
+└── scripts/
+    ├── migrate.sh                # Database migration
+    └── setup-minio.sh            # MinIO bucket setup
+```
+
 ## 🆘 Support
 
 For issues or questions:
 1. Check this README
-2. Review worker logs: `pnpm worker`
-3. Check Docker logs: `docker-compose logs`
-4. Verify all services running: `docker ps`
+2. Review [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)
+3. Check logs: `docker logs kowiz-web` or `docker logs kowiz-worker`
+4. Verify services: `docker ps`
 
 ---
 

@@ -22,8 +22,8 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 # Copy package files
 COPY package.json pnpm-lock.yaml* ./
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile --prod
+# Install all dependencies (including tsx for TypeScript execution)
+RUN pnpm install --frozen-lockfile
 
 # Production image
 FROM base AS runner
@@ -58,8 +58,11 @@ COPY --chown=worker:nodejs . .
 
 USER worker
 
+# Enable pnpm for the runner
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
 # Create temp directories with proper permissions
 RUN mkdir -p /tmp/kowiz-conversions /tmp/kowiz-downloads
 
-CMD ["node", "--loader", "tsx/esm", "worker.ts"]
+CMD ["pnpm", "exec", "tsx", "worker.ts"]
 
