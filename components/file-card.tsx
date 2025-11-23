@@ -52,11 +52,11 @@ export function FileCard({ file, onRetry }: FileCardProps) {
   const handleDownload = async (type: 'raw' | 'converted') => {
     try {
       setDownloading(type);
-      
+
       // Open download endpoint directly - it will stream the file
       const downloadUrl = `/api/files/${file.id}/download?type=${type}`;
       window.open(downloadUrl, '_blank');
-      
+
       toast.success(`Downloading ${type} file...`);
     } catch (error) {
       console.error('Download error:', error);
@@ -206,34 +206,32 @@ export function FileCard({ file, onRetry }: FileCardProps) {
             </div>
           )}
 
-          {/* Download Buttons */}
-          {file.status !== 'failed' && (
-            <div className="flex gap-2">
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleDownload('raw')}
+              disabled={downloading !== null}
+              className="flex-1"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              {downloading === 'raw' ? 'Getting URL...' : 'Download Original'}
+            </Button>
+
+            {file.processedFilePath && file.status === 'completed' && (
               <Button
-                variant="outline"
+                variant="default"
                 size="sm"
-                onClick={() => handleDownload('raw')}
+                onClick={() => handleDownload('converted')}
                 disabled={downloading !== null}
                 className="flex-1"
               >
                 <Download className="h-4 w-4 mr-2" />
-                {downloading === 'raw' ? 'Getting URL...' : 'Download Original'}
+                {downloading === 'converted' ? 'Getting URL...' : 'Download Converted'}
               </Button>
-              
-              {file.processedFilePath && file.status === 'completed' && (
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => handleDownload('converted')}
-                  disabled={downloading !== null}
-                  className="flex-1"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  {downloading === 'converted' ? 'Getting URL...' : 'Download Converted'}
-                </Button>
-              )}
-            </div>
-          )}
+            )}
+          </div>
+
 
           {/* Retry Button */}
           {file.status === 'failed' && (file.retryCount || 0) < 3 && (

@@ -4,7 +4,12 @@ import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, Download, FileCheck } from 'lucide-react';
+import { Search, Download, FileCheck, Pencil } from 'lucide-react';
+import dynamic from 'next/dynamic';
+
+const ImageEditorModal = dynamic(() => import('./image-editor-modal'), {
+  ssr: false,
+});
 import { toast } from 'sonner';
 import type { File } from '@/lib/db/schema';
 
@@ -15,6 +20,7 @@ interface CompletedTabProps {
 export function CompletedTab({ files }: CompletedTabProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [editingFile, setEditingFile] = useState<File | null>(null);
 
   const completedFiles = files.filter(f => f.status === 'completed');
 
@@ -25,11 +31,11 @@ export function CompletedTab({ files }: CompletedTabProps) {
   const handleDownload = async (fileId: string, type: 'raw' | 'converted') => {
     try {
       setDownloading(`${fileId}-${type}`);
-      
+
       // Open download endpoint directly - it will stream the file
       const downloadUrl = `/api/files/${fileId}/download?type=${type}`;
       window.open(downloadUrl, '_blank');
-      
+
       toast.success(`Downloading ${type} file...`);
     } catch (error) {
       console.error('Download error:', error);
@@ -49,7 +55,7 @@ export function CompletedTab({ files }: CompletedTabProps) {
 
   const formatTimeAgo = (date: Date) => {
     const seconds = Math.floor((new Date().getTime() - new Date(date).getTime()) / 1000);
-    
+
     if (seconds < 60) return 'Just now';
     if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
     if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
@@ -170,6 +176,19 @@ export function CompletedTab({ files }: CompletedTabProps) {
                         Converted
                       </Button>
                     )}
+
+                    {/* Edit Button for Images */}
+                    {file.category === 'image' && file.processedFilePath && (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => setEditingFile(file)}
+                        className="bg-orange-500 hover:bg-orange-600 text-white"
+                      >
+                        <Pencil className="h-4 w-4 mr-2" />
+                        Edit Image
+                      </Button>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -177,7 +196,20 @@ export function CompletedTab({ files }: CompletedTabProps) {
           ))
         )}
       </div>
-    </div>
+
+
+      {/* Image Editor Modal */}
+      {
+        editingFile && (
+          <ImageEditorModal
+            isOpen={!!editingFile}
+            onClose={() => setEditingFile(null)}
+            imageUrl={`/api/files/${editingFile.id}/download?type=${editingFile.processedFilePath ? 'converted' : 'raw'}`}
+            fileName={editingFile.name}
+          />
+        )
+      }
+    </div >
   );
 }
 
