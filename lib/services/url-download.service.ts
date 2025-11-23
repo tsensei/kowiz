@@ -233,5 +233,3 @@ export class UrlDownloadService {
 
 export const urlDownloadService = new UrlDownloadService();
 
-export const urlDownloadService = new UrlDownloadService();
-
