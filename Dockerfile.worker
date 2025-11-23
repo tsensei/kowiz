@@ -4,15 +4,39 @@ FROM node:20-alpine AS base
 # Install FFmpeg, ImageMagick, yt-dlp, and required dependencies
 FROM base AS deps
 RUN apk add --no-cache \
+    # Core tools
     ffmpeg \
     imagemagick \
-    imagemagick-heic \
-    libheif \
-    libheif-tools \
     python3 \
     py3-pip \
     curl \
-    libc6-compat
+    libc6-compat \
+    # Image format support
+    imagemagick-heic \
+    libheif \
+    libheif-tools \
+    libwebp \
+    libwebp-tools \
+    libjpeg-turbo \
+    libjpeg-turbo-utils \
+    libpng \
+    giflib \
+    tiff \
+    # RAW image format support
+    libraw \
+    libraw-tools \
+    dcraw \
+    # Video codec support
+    x264-libs \
+    x265-libs \
+    libvpx \
+    opus \
+    # Audio codec support
+    lame \
+    libvorbis \
+    flac \
+    # Additional utilities
+    exiftool
 
 # Install yt-dlp
 RUN pip3 install --no-cache-dir yt-dlp --break-system-packages
@@ -34,25 +58,60 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
-# Install runtime dependencies
+# Install runtime dependencies (same as deps stage)
 RUN apk add --no-cache \
+    # Core tools
     ffmpeg \
     imagemagick \
+    python3 \
+    py3-pip \
+    curl \
+    # Image format support
     imagemagick-heic \
     libheif \
     libheif-tools \
-    python3 \
-    py3-pip \
-    curl
+    libwebp \
+    libwebp-tools \
+    libjpeg-turbo \
+    libjpeg-turbo-utils \
+    libpng \
+    giflib \
+    tiff \
+    # RAW image format support
+    libraw \
+    libraw-tools \
+    dcraw \
+    # Video codec support
+    x264-libs \
+    x265-libs \
+    libvpx \
+    opus \
+    # Audio codec support
+    lame \
+    libvorbis \
+    flac \
+    # Additional utilities
+    exiftool
 
 # Install yt-dlp
 RUN pip3 install --no-cache-dir yt-dlp --break-system-packages
 
-# Verify installations
-RUN ffmpeg -version && \
+# Verify installations and codec support
+RUN echo "=== Verifying Tools ===" && \
+    ffmpeg -version | head -3 && \
+    echo "" && \
     yt-dlp --version && \
-    convert -version && \
-    convert -list format | grep -i heic || echo "HEIC support check"
+    echo "" && \
+    convert -version | head -3 && \
+    echo "" && \
+    echo "=== Codec Support ===" && \
+    echo "HEIC:" && convert -list format | grep -i heic && \
+    echo "WebP:" && convert -list format | grep -i webp && \
+    echo "RAW:" && convert -list format | grep -E "(CR2|NEF|ARW|DNG)" && \
+    echo "VP9:" && ffmpeg -codecs 2>&1 | grep vp9 && \
+    echo "Opus:" && ffmpeg -codecs 2>&1 | grep opus && \
+    echo "Vorbis:" && ffmpeg -codecs 2>&1 | grep vorbis && \
+    echo "=== All codecs verified ==="
 
 # Enable pnpm BEFORE creating user (needs root)
 RUN corepack enable && corepack prepare pnpm@latest --activate
