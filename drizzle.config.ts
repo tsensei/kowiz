@@ -10,6 +10,7 @@ export default defineConfig({
     user: process.env.DATABASE_USER || 'postgres',
     password: process.env.DATABASE_PASSWORD || 'postgres',
     database: process.env.DATABASE_NAME || 'kowiz',
+    ssl: false, // Disable SSL for local development
   },
 });
 
