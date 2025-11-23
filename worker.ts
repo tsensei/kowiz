@@ -137,6 +137,20 @@ async function startWorker() {
     await boss.start();
     console.log('✓ pg-boss connected to PostgreSQL');
 
+    // Create the queue (pg-boss requires explicit queue creation)
+    console.log('Creating file-conversion queue...');
+    try {
+      await boss.createQueue('file-conversion');
+      console.log('✓ Queue created');
+    } catch (error: any) {
+      // Queue might already exist
+      if (error?.message?.includes('already exists')) {
+        console.log('✓ Queue already exists');
+      } else {
+        throw error;
+      }
+    }
+
     console.log('\n🚀 Worker started and waiting for conversion jobs...');
     console.log('   Concurrency: 2 jobs');
     console.log('   Queue: PostgreSQL (pg-boss)');
