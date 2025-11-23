@@ -66,7 +66,7 @@ export function UrlImport({ onImportSuccess }: UrlImportProps) {
             <div className="flex-1">
               <h3 className="font-semibold mb-1">Import from URL</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Paste a YouTube URL or direct link to import media
+                Paste a URL from YouTube, Vimeo, Instagram, TikTok, Twitch, or direct media link
               </p>
               
               <div className="flex gap-2">
@@ -110,12 +110,20 @@ export function UrlImport({ onImportSuccess }: UrlImportProps) {
               <span>Vimeo</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <ExternalLink className="h-3.5 w-3.5 text-orange-600" />
-              <span>Direct Links</span>
+              <ExternalLink className="h-3.5 w-3.5 text-pink-600" />
+              <span>Instagram</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <ExternalLink className="h-3.5 w-3.5 text-green-600" />
-              <span>SoundCloud</span>
+              <ExternalLink className="h-3.5 w-3.5 text-slate-900 dark:text-slate-100" />
+              <span>TikTok</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <ExternalLink className="h-3.5 w-3.5 text-purple-600" />
+              <span>Twitch</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <ExternalLink className="h-3.5 w-3.5 text-slate-600" />
+              <span>+1800 more</span>
             </div>
           </div>
         </div>

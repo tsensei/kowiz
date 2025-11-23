@@ -131,12 +131,28 @@ export class UrlValidationService {
    */
   private detectPlatform(url: URL): string | null {
     const platformMap: Record<string, string> = {
+      // Top 5 major platforms
       'vimeo.com': 'Vimeo',
       'www.vimeo.com': 'Vimeo',
+      'player.vimeo.com': 'Vimeo',
+      'instagram.com': 'Instagram',
+      'www.instagram.com': 'Instagram',
+      'tiktok.com': 'TikTok',
+      'www.tiktok.com': 'TikTok',
+      'vm.tiktok.com': 'TikTok',
+      'facebook.com': 'Facebook',
+      'www.facebook.com': 'Facebook',
+      'fb.watch': 'Facebook',
+      'twitch.tv': 'Twitch',
+      'www.twitch.tv': 'Twitch',
+      'm.twitch.tv': 'Twitch',
+      // Additional supported platforms
       'dailymotion.com': 'Dailymotion',
       'www.dailymotion.com': 'Dailymotion',
       'soundcloud.com': 'SoundCloud',
       'www.soundcloud.com': 'SoundCloud',
+      'twitter.com': 'Twitter/X',
+      'x.com': 'Twitter/X',
     };
     
     return platformMap[url.hostname] || null;
