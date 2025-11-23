@@ -17,12 +17,16 @@ export const files = pgTable('files', {
   // Size tracking
   convertedSize: bigint('converted_size', { mode: 'number' }), // size after conversion in bytes
   
+  // Import tracking
+  importSource: varchar('import_source', { length: 50 }).notNull().default('upload'), // upload, youtube, direct_url
+  sourceUrl: text('source_url'), // Original URL if imported
+  
   // Storage paths
   rawFilePath: varchar('raw_file_path', { length: 500 }).notNull(), // path in raw-files bucket
   processedFilePath: varchar('processed_file_path', { length: 500 }), // path in processed-files bucket
   
   // Status and error tracking
-  status: varchar('status', { length: 50 }).notNull().default('pending'), // pending, queued, converting, uploading, completed, failed
+  status: varchar('status', { length: 50 }).notNull().default('pending'), // pending, queued, downloading, converting, uploading, completed, failed
   errorMessage: text('error_message'),
   retryCount: bigint('retry_count', { mode: 'number' }).default(0),
   

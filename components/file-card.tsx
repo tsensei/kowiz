@@ -156,6 +156,11 @@ export function FileCard({ file, onRetry }: FileCardProps) {
                 </h3>
                 <p className="text-sm text-muted-foreground capitalize">
                   {file.category} • {formatSize(file.size)}
+                  {file.importSource && file.importSource !== 'upload' && (
+                    <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">
+                      • Imported via {file.importSource === 'youtube' ? 'YouTube' : 'URL'}
+                    </span>
+                  )}
                 </p>
               </div>
             </div>

@@ -7,7 +7,8 @@ Automatic media conversion system for Wikimedia Commons. Upload any media file a
 - **🎯 Smart Format Detection** - Automatically detects and categorizes media files (image/video/audio/RAW)
 - **🔄 Auto Conversion** - Converts unsupported formats to Commons-compatible formats using FFmpeg and ImageMagick
 - **📤 Drag & Drop Upload** - Modern upload interface with multi-file and folder support
-- **⚡ Background Processing** - BullMQ queue system with concurrent workers
+- **🔗 URL Import** - Import videos from YouTube, Vimeo, or direct links using yt-dlp
+- **⚡ Background Processing** - pg-boss queue system with PostgreSQL backend
 - **📊 Real-time Monitoring** - Live progress tracking with auto-refresh
 - **💾 Dual Storage** - Preserves original files and stores converted versions in MinIO
 - **🔁 Automatic Retry** - Failed conversions retry up to 3 times automatically
@@ -69,20 +70,23 @@ Worker (Background processing)
 - **pnpm** package manager
 - **Docker** & Docker Compose
 - **FFmpeg** (for media conversion)
+- **yt-dlp** (for URL imports from YouTube, Vimeo, etc.)
 
 ### Installation
 
-1. **Install FFmpeg and ImageMagick:**
+1. **Install FFmpeg, ImageMagick, and yt-dlp:**
 
 ```bash
 # macOS
-brew install ffmpeg imagemagick
+brew install ffmpeg imagemagick yt-dlp
 
 # Ubuntu/Debian
 sudo apt update && sudo apt install ffmpeg imagemagick
+pip install yt-dlp
 
 # Verify installation
 ffmpeg -version
+yt-dlp --version
 ```
 
 2. **Clone and install dependencies:**
@@ -127,9 +131,10 @@ http://localhost:3000
 ## 🎬 Usage
 
 ### Upload Tab
-1. Drag and drop files or click to browse
-2. Click "Upload Folder" for bulk uploads
-3. View quick stats and recently uploaded files
+1. **File Upload:** Drag and drop files or click to browse
+2. **Folder Upload:** Click "Upload Folder" for bulk uploads
+3. **URL Import:** Paste YouTube or direct media URLs to import
+4. View quick stats and recently uploaded files
 
 ### Queue Tab
 4. Monitor active conversions with real-time progress
@@ -530,6 +535,13 @@ pnpm drizzle-kit push
 POST /api/upload
 Body: FormData with 'files' field (multiple files)
 Response: { success, results, totalFiles, successfulUploads, failedUploads }
+```
+
+### Import from URL
+```typescript
+POST /api/import-url
+Body: { url: string }
+Response: { success, file: { id, name, importSource, sourceUrl, status, type, platform } }
 ```
 
 ### Get All Files

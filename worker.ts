@@ -5,6 +5,7 @@ import { ConversionJobData } from './lib/services/queue.service';
 import { databaseService } from './lib/services/database.service';
 import { minioService, BUCKETS } from './lib/services/minio.service';
 import { conversionService } from './lib/services/conversion.service';
+import { urlDownloadService } from './lib/services/url-download.service';
 
 const connectionString = `postgresql://${process.env.DATABASE_USER || 'postgres'}:${process.env.DATABASE_PASSWORD || 'postgres'}@${process.env.DATABASE_HOST || 'localhost'}:${process.env.DATABASE_PORT || 5432}/${process.env.DATABASE_NAME || 'kowiz'}`;
 
@@ -33,6 +34,66 @@ async function processConversionJob(jobs: Job<ConversionJobData>[]) {
       console.log(`Target Format: ${fileRecord.targetFormat}`);
       console.log(`Needs Conversion: ${fileRecord.needsConversion}`);
 
+      let fileBuffer: Buffer;
+      let actualFileName = fileRecord.name;
+      let actualFormat = fileRecord.originalFormat;
+
+      // Check if this is a URL import
+      if (fileRecord.sourceUrl && fileRecord.importSource !== 'upload') {
+        console.log(`Downloading from ${fileRecord.importSource}: ${fileRecord.sourceUrl}`);
+        
+        // Update status to downloading
+        await databaseService.updateFileStatus(fileId, 'downloading');
+
+        // Download from URL
+        const downloadPath = urlDownloadService.getTempPath(`download-${fileId}.tmp`);
+        const downloadResult = await urlDownloadService.download({
+          url: fileRecord.sourceUrl,
+          type: fileRecord.importSource === 'youtube' ? 'youtube' : 'direct',
+          outputPath: downloadPath,
+        });
+
+        if (!downloadResult.success) {
+          throw new Error(downloadResult.error || 'URL download failed');
+        }
+
+        console.log(`✓ Downloaded: ${downloadResult.fileName}`);
+        console.log(`  Size: ${Math.round((downloadResult.fileSize || 0) / 1024 / 1024 * 100) / 100} MB`);
+
+        // Read the downloaded file
+        fileBuffer = await fs.readFile(downloadResult.filePath!);
+        actualFileName = downloadResult.fileName || fileRecord.name;
+        actualFormat = downloadResult.format || fileRecord.originalFormat;
+
+        // Upload to MinIO for storage
+        console.log('Uploading downloaded file to MinIO...');
+        await minioService.uploadFile(
+          BUCKETS.RAW_FILES,
+          fileRecord.rawFilePath,
+          fileBuffer,
+          {
+            'Content-Type': `video/${actualFormat}`,
+            'original-url': fileRecord.sourceUrl,
+            'import-source': fileRecord.importSource,
+          }
+        );
+
+        // Update file record with actual metadata
+        await databaseService.updateFileStatus(fileId, 'converting');
+        
+        // Clean up temp download file
+        await urlDownloadService.cleanup(downloadResult.filePath!);
+
+        console.log('✓ File uploaded to MinIO');
+      } else {
+        // Normal flow: download from MinIO
+        console.log('Downloading file from MinIO...');
+        fileBuffer = await minioService.downloadFile(
+          BUCKETS.RAW_FILES,
+          fileRecord.rawFilePath
+        );
+      }
+
       // Update status to converting
       await databaseService.updateFileStatus(fileId, 'converting');
 
@@ -40,16 +101,9 @@ async function processConversionJob(jobs: Job<ConversionJobData>[]) {
       if (fileRecord.needsConversion === 'false' || !fileRecord.targetFormat) {
         console.log('✓ No conversion needed - file is already in supported format');
         await databaseService.updateFileStatus(fileId, 'completed');
-      // Job completes automatically when function returns without error
-      return { success: true, fileId, converted: false };
-    }
-
-    // Download file from MinIO
-    console.log('Downloading file from MinIO...');
-    const fileBuffer = await minioService.downloadFile(
-      BUCKETS.RAW_FILES,
-      fileRecord.rawFilePath
-    );
+        // Job completes automatically when function returns without error
+        return { success: true, fileId, converted: false };
+      }
 
       // Ensure temp directory exists
       await conversionService.init();

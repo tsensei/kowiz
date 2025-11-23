@@ -1,7 +1,9 @@
 'use client';
 
 import { FileDropzone } from '@/components/file-dropzone';
+import { UrlImport } from '@/components/url-import';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 import { CheckCircle2, Clock, FileText, TrendingUp } from 'lucide-react';
 import type { File } from '@/lib/db/schema';
 
@@ -39,6 +41,21 @@ export function UploadTab({ files, onUploadSuccess }: UploadTabProps) {
           <FileDropzone onUploadSuccess={onUploadSuccess} />
         </CardContent>
       </Card>
+
+      {/* Separator */}
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <Separator />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-background px-2 text-muted-foreground">
+            Or
+          </span>
+        </div>
+      </div>
+
+      {/* URL Import */}
+      <UrlImport onImportSuccess={onUploadSuccess} />
 
       {/* Quick Stats */}
       <div>

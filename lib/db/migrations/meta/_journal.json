@@ -15,6 +15,13 @@
       "when": 1763890611067,
       "tag": "0001_parallel_next_avengers",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1763896826222,
+      "tag": "0002_little_sauron",
+      "breakpoints": true
     }
   ]
 }

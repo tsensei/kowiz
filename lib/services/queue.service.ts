@@ -19,16 +19,6 @@ export class QueueService {
   async start(): Promise<void> {
     if (!this.started) {
       await this.boss.start();
-      
-      // Create the queue if it doesn't exist
-      // pg-boss requires explicit queue creation
-      try {
-        await this.boss.createQueue('file-conversion');
-      } catch (error) {
-        // Queue might already exist, that's okay
-        // pg-boss throws if queue already exists
-      }
-      
       this.started = true;
       console.log('✓ pg-boss queue started');
     }
