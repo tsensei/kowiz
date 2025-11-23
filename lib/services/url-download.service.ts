@@ -93,6 +93,11 @@ export class UrlDownloadService {
       } catch (error) {
         console.warn(`Failed with player client ${playerClient}:`, error instanceof Error ? error.message : error);
         lastError = error instanceof Error ? error : new Error(String(error));
+        
+        // Clean up files created by this failed attempt before trying next player client
+        // This prevents the next attempt from detecting overwritten files as "existing"
+        await this.cleanupOrphanedFiles(outputDir, tempFileName);
+        
         // Continue to next player client
       }
     }
