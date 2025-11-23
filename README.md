@@ -586,7 +586,43 @@ POST /api/files/requeue-pending     # Requeue pending files
 
 ## 🚀 Production Deployment
 
-### Using PM2
+### Docker Deployment (Recommended)
+
+**Complete deployment guide:** See [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)
+
+**Quick Start:**
+
+1. **Setup GitHub Secrets** - See [GITHUB_SECRETS_SETUP.md](./GITHUB_SECRETS_SETUP.md)
+   ```
+   REGISTRY_URL, REGISTRY_USERNAME, REGISTRY_PASSWORD
+   ```
+
+2. **Push to GitHub** - Triggers automatic build
+   ```bash
+   git push origin main
+   ```
+
+3. **Deploy with Coolify**
+   - Use `docker-compose.prod.yml`
+   - Configure environment variables
+   - Deploy and run migrations
+
+4. **Or Deploy Manually**
+   ```bash
+   docker-compose -f docker-compose.prod.yml up -d
+   ./scripts/migrate.sh
+   ```
+
+### Local Testing with Docker
+
+```bash
+# Full end-to-end test
+docker-compose -f docker-compose.local.yml up --build
+
+# Access at http://localhost:3000
+```
+
+### Using PM2 (Alternative)
 
 ```bash
 # Install PM2

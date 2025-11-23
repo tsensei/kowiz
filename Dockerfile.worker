@@ -1,0 +1,65 @@
+# Worker Dockerfile with FFmpeg, ImageMagick, and yt-dlp
+FROM node:20-alpine AS base
+
+# Install FFmpeg, ImageMagick, yt-dlp, and required dependencies
+FROM base AS deps
+RUN apk add --no-cache \
+    ffmpeg \
+    imagemagick \
+    python3 \
+    py3-pip \
+    curl \
+    libc6-compat
+
+# Install yt-dlp
+RUN pip3 install --no-cache-dir yt-dlp --break-system-packages
+
+WORKDIR /app
+
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+# Copy package files
+COPY package.json pnpm-lock.yaml* ./
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile --prod
+
+# Production image
+FROM base AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+# Install runtime dependencies
+RUN apk add --no-cache \
+    ffmpeg \
+    imagemagick \
+    python3 \
+    py3-pip \
+    curl
+
+# Install yt-dlp
+RUN pip3 install --no-cache-dir yt-dlp --break-system-packages
+
+# Verify installations
+RUN ffmpeg -version && \
+    yt-dlp --version && \
+    convert -version
+
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 worker
+
+# Copy node_modules from deps
+COPY --from=deps /app/node_modules ./node_modules
+
+# Copy application code
+COPY --chown=worker:nodejs . .
+
+USER worker
+
+# Create temp directories with proper permissions
+RUN mkdir -p /tmp/kowiz-conversions /tmp/kowiz-downloads
+
+CMD ["node", "--loader", "tsx/esm", "worker.ts"]
+
