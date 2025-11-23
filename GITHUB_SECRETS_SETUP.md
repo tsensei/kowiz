@@ -4,7 +4,7 @@ Quick guide to configure GitHub Actions for automatic Docker image builds.
 
 ## 📝 Required Secrets
 
-You need to add **3 secrets** to your GitHub repository.
+You need to add **5 secrets** to your GitHub repository.
 
 ## 🔧 Step-by-Step Setup
 
@@ -66,6 +66,50 @@ github-username
 
 ---
 
+#### Secret 4: COOLIFY_API_TOKEN
+
+**Name:** `COOLIFY_API_TOKEN`
+
+**Value:** Your Coolify API token (bearer token)
+
+**How to get it:**
+1. Log in to your Coolify instance
+2. Go to: **Keys & Tokens** → **API tokens**
+3. Create a new API token
+4. Copy the token value
+5. Use it as `COOLIFY_API_TOKEN`
+
+**Notes:**
+- This token is used to authenticate with Coolify's deploy webhook
+- Keep it secure and don't share it publicly
+
+---
+
+#### Secret 5: COOLIFY_RESOURCE_UUID
+
+**Name:** `COOLIFY_RESOURCE_UUID`
+
+**Value:** Your Coolify resource UUID
+
+**How to get it:**
+1. Log in to your Coolify instance
+2. Navigate to your application/resource
+3. The UUID can be found in:
+   - The deploy webhook URL: `https://platform.kowiz.tsensei.dev/api/v1/deploy?uuid=YOUR-UUID-HERE&force=false`
+   - Or in the resource settings/details page
+4. Copy the UUID (without the `uuid=` prefix)
+
+**Example:**
+```
+abc12345-6789-0123-4567-890abcdef012
+```
+
+**Notes:**
+- This is the unique identifier for your Coolify resource
+- Used to trigger deployments for the correct resource
+
+---
+
 ## ✅ Verification
 
 After adding secrets, your repository should show:
@@ -73,10 +117,12 @@ After adding secrets, your repository should show:
 ```
 Settings → Secrets and variables → Actions
 
-Repository secrets (3)
-├── REGISTRY_URL         ****************
-├── REGISTRY_USERNAME    ****************
-└── REGISTRY_PASSWORD    ****************
+Repository secrets (5)
+├── REGISTRY_URL            ****************
+├── REGISTRY_USERNAME       ****************
+├── REGISTRY_PASSWORD       ****************
+├── COOLIFY_API_TOKEN       ****************
+└── COOLIFY_RESOURCE_UUID   ****************
 ```
 
 ## 🧪 Test the Setup
@@ -159,7 +205,18 @@ Once secrets are set up correctly, every push to `main` will automatically:
 2. ✅ Run tests (if configured)
 3. ✅ Push to your registry
 4. ✅ Tag with multiple tags
-5. ✅ Ready for deployment
+5. ✅ Trigger Coolify deployment with force rebuild
 
-You can now deploy using these images in Coolify or any Docker environment! 🎉
+The workflow will automatically trigger a **force deployment** in Coolify after successfully pushing the images, so your application will be automatically updated! 🎉
+
+## 🚀 Coolify Deployment
+
+The workflow includes an automatic Coolify deployment step that:
+
+- Triggers after successful image push
+- Uses force rebuild (`force=true`) to ensure fresh deployment
+- Authenticates using your `COOLIFY_API_TOKEN`
+- Deploys the resource identified by `COOLIFY_RESOURCE_UUID`
+
+**Note:** Make sure your Coolify resource is configured to pull from the same registry where images are being pushed.
 

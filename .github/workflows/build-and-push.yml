@@ -76,3 +76,16 @@ jobs:
           echo "Web Image: ${{ steps.meta-web.outputs.tags }}"
           echo "Worker Image: ${{ steps.meta-worker.outputs.tags }}"
 
+      - name: Trigger Coolify deployment
+        if: success()
+        run: |
+          echo "Triggering Coolify deployment with force rebuild..."
+          response=$(curl -f -X POST \
+            -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"uuid": "${{ secrets.COOLIFY_RESOURCE_UUID }}", "force": true}' \
+            -w "\nHTTP Status: %{http_code}\n" \
+            https://platform.kowiz.tsensei.dev/api/v1/deploy)
+          echo "$response"
+          echo "✅ Deployment triggered successfully!"
+
