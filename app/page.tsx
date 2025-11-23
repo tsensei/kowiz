@@ -107,11 +107,11 @@ export default function Home() {
               <div>
                 <h1 className="text-xl font-bold">
                   KOWiz
-                </h1>
+          </h1>
                 <p className="text-xs text-muted-foreground">
                   Wikimedia Commons Converter
-                </p>
-              </div>
+          </p>
+        </div>
             </div>
             <div className="flex items-center gap-3">
               {stats.processing > 0 && (

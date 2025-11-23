@@ -82,6 +82,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     networks:
       - kowiz-network
 
@@ -106,6 +108,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     networks:
       - kowiz-network
     restart: unless-stopped

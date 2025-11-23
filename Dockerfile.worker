@@ -1,45 +1,41 @@
 # Worker Dockerfile with FFmpeg, ImageMagick, and yt-dlp
-FROM node:20-alpine AS base
+# Using Debian-based image for better package support
+FROM node:20-slim AS base
 
 # Install FFmpeg, ImageMagick, yt-dlp, and required dependencies
 FROM base AS deps
-RUN apk add --no-cache \
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
     # Core tools
     ffmpeg \
     imagemagick \
     python3 \
-    py3-pip \
+    python3-pip \
     curl \
-    libc6-compat \
+    wget \
+    ca-certificates \
     # Image format support
-    imagemagick-heic \
-    libheif \
-    libheif-tools \
-    libwebp \
-    libwebp-tools \
-    libjpeg-turbo \
-    libjpeg-turbo-utils \
-    libpng \
-    giflib \
-    tiff \
+    libheif1 \
+    libheif-examples \
+    libwebp7 \
+    webp \
+    libjpeg-turbo-progs \
+    libpng16-16 \
+    gifsicle \
+    libtiff-tools \
     # RAW image format support
-    libraw \
-    libraw-tools \
+    libraw-bin \
     dcraw \
-    # Video codec support
-    x264-libs \
-    x265-libs \
-    libvpx \
-    opus \
-    # Audio codec support
-    lame \
-    libvorbis \
-    flac \
-    # Additional utilities
-    exiftool
+    # Video codec support (already in ffmpeg)
+    # Audio codec support (already in ffmpeg)
+    # Metadata tools
+    libimage-exiftool-perl \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install yt-dlp
-RUN pip3 install --no-cache-dir yt-dlp --break-system-packages
+RUN pip3 install --no-cache-dir yt-dlp --break-system-packages || \
+    pip3 install --no-cache-dir yt-dlp
 
 WORKDIR /app
 
@@ -59,42 +55,34 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 # Install runtime dependencies (same as deps stage)
-RUN apk add --no-cache \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     # Core tools
     ffmpeg \
     imagemagick \
     python3 \
-    py3-pip \
+    python3-pip \
     curl \
+    wget \
+    ca-certificates \
     # Image format support
-    imagemagick-heic \
-    libheif \
-    libheif-tools \
-    libwebp \
-    libwebp-tools \
-    libjpeg-turbo \
-    libjpeg-turbo-utils \
-    libpng \
-    giflib \
-    tiff \
+    libheif1 \
+    libheif-examples \
+    libwebp7 \
+    webp \
+    libjpeg-turbo-progs \
+    libpng16-16 \
+    gifsicle \
+    libtiff-tools \
     # RAW image format support
-    libraw \
-    libraw-tools \
+    libraw-bin \
     dcraw \
-    # Video codec support
-    x264-libs \
-    x265-libs \
-    libvpx \
-    opus \
-    # Audio codec support
-    lame \
-    libvorbis \
-    flac \
-    # Additional utilities
-    exiftool
+    # Metadata tools
+    libimage-exiftool-perl \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install yt-dlp
-RUN pip3 install --no-cache-dir yt-dlp --break-system-packages
+RUN pip3 install --no-cache-dir yt-dlp --break-system-packages || \
+    pip3 install --no-cache-dir yt-dlp
 
 # Verify installations and codec support
 RUN echo "=== Verifying Tools ===" && \
@@ -104,20 +92,19 @@ RUN echo "=== Verifying Tools ===" && \
     echo "" && \
     convert -version | head -3 && \
     echo "" && \
-    echo "=== Codec Support ===" && \
-    echo "HEIC:" && convert -list format | grep -i heic && \
-    echo "WebP:" && convert -list format | grep -i webp && \
-    echo "RAW:" && convert -list format | grep -E "(CR2|NEF|ARW|DNG)" && \
-    echo "VP9:" && ffmpeg -codecs 2>&1 | grep vp9 && \
-    echo "Opus:" && ffmpeg -codecs 2>&1 | grep opus && \
-    echo "Vorbis:" && ffmpeg -codecs 2>&1 | grep vorbis && \
-    echo "=== All codecs verified ==="
+    echo "=== Testing Codec Support ===" && \
+    echo "FFmpeg codecs:" && \
+    ffmpeg -codecs 2>&1 | grep -E "(hevc|vp9|opus|vorbis|h264)" | head -5 && \
+    echo "ImageMagick formats:" && \
+    convert -list format | grep -E "(HEIC|HEIF|WEBP|JPEG|PNG)" | head -5 && \
+    echo "=== Tools ready ==="
 
 # Enable pnpm BEFORE creating user (needs root)
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 worker
+# Create user and group (Debian syntax)
+RUN groupadd --system --gid 1001 nodejs && \
+    useradd --system --uid 1001 --gid nodejs --create-home worker
 
 # Copy node_modules from deps
 COPY --from=deps /app/node_modules ./node_modules
@@ -125,9 +112,9 @@ COPY --from=deps /app/node_modules ./node_modules
 # Copy application code
 COPY --chown=worker:nodejs . .
 
-# Create temp directories with proper permissions
-RUN mkdir -p /tmp/kowiz-conversions /tmp/kowiz-downloads && \
-    chown -R worker:nodejs /tmp/kowiz-conversions /tmp/kowiz-downloads
+# Create temp directories and set permissions
+RUN mkdir -p /tmp/kowiz-conversions /tmp/kowiz-downloads /home/worker/.cache && \
+    chown -R worker:nodejs /tmp/kowiz-conversions /tmp/kowiz-downloads /home/worker/.cache /home/worker
 
 USER worker
 

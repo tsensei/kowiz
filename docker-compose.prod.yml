@@ -2,6 +2,10 @@
 # This assumes Coolify provides PostgreSQL and MinIO services
 # Or you can include them here if self-hosting everything
 
+# IMPORTANT: Run database migrations BEFORE starting these services!
+# Method 1: docker exec kowiz-web pnpm drizzle-kit push
+# Method 2: ./scripts/migrate.sh (set env vars first)
+
 services:
   web:
     image: ${REGISTRY_URL}/kowiz-web:latest
