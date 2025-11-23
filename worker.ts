@@ -1,18 +1,18 @@
-import { Worker, Job } from 'bullmq';
+import { PgBoss } from 'pg-boss';
+import type { Job } from 'pg-boss';
 import * as fs from 'fs/promises';
 import { ConversionJobData } from './lib/services/queue.service';
 import { databaseService } from './lib/services/database.service';
 import { minioService, BUCKETS } from './lib/services/minio.service';
 import { conversionService } from './lib/services/conversion.service';
 
-const connection = {
-  host: process.env.REDIS_HOST || 'localhost',
-  port: Number(process.env.REDIS_PORT) || 6379,
-};
+const connectionString = `postgresql://${process.env.DATABASE_USER || 'postgres'}:${process.env.DATABASE_PASSWORD || 'postgres'}@${process.env.DATABASE_HOST || 'localhost'}:${process.env.DATABASE_PORT || 5432}/${process.env.DATABASE_NAME || 'kowiz'}`;
 
-const worker = new Worker<ConversionJobData>(
-  'file-conversion',
-  async (job: Job<ConversionJobData>) => {
+const boss = new PgBoss(connectionString);
+
+async function processConversionJob(jobs: Job<ConversionJobData>[]) {
+  // pg-boss can batch jobs, but we'll process them one at a time
+  for (const job of jobs) {
     const { fileId, fileName, mimeType } = job.data;
 
     console.log('\n=== Processing Conversion Job ===');
@@ -40,15 +40,16 @@ const worker = new Worker<ConversionJobData>(
       if (fileRecord.needsConversion === 'false' || !fileRecord.targetFormat) {
         console.log('✓ No conversion needed - file is already in supported format');
         await databaseService.updateFileStatus(fileId, 'completed');
-        return { success: true, fileId, converted: false };
-      }
+      // Job completes automatically when function returns without error
+      return { success: true, fileId, converted: false };
+    }
 
-      // Download file from MinIO
-      console.log('Downloading file from MinIO...');
-      const fileBuffer = await minioService.downloadFile(
-        BUCKETS.RAW_FILES,
-        fileRecord.rawFilePath
-      );
+    // Download file from MinIO
+    console.log('Downloading file from MinIO...');
+    const fileBuffer = await minioService.downloadFile(
+      BUCKETS.RAW_FILES,
+      fileRecord.rawFilePath
+    );
 
       // Ensure temp directory exists
       await conversionService.init();
@@ -112,6 +113,7 @@ const worker = new Worker<ConversionJobData>(
       console.log(`✓ File ${fileName} processed successfully!`);
       console.log('=================================\n');
 
+      // Job completes automatically when function returns without error
       return { success: true, fileId, converted: true };
     } catch (error) {
       console.error('❌ Error processing job:', error);
@@ -121,46 +123,59 @@ const worker = new Worker<ConversionJobData>(
       await databaseService.incrementRetryCount(fileId);
       
       console.log('=================================\n');
+      
+      // pg-boss automatically retries when error is thrown
       throw error;
     }
-  },
-  { 
-    connection,
-    concurrency: 2, // Process 2 jobs concurrently
   }
-);
+}
 
-worker.on('completed', (job) => {
-  console.log(`✓ Job ${job.id} completed successfully`);
-});
+// Start pg-boss and worker
+async function startWorker() {
+  try {
+    console.log('Starting pg-boss...');
+    await boss.start();
+    console.log('✓ pg-boss connected to PostgreSQL');
 
-worker.on('failed', (job, err) => {
-  console.error(`❌ Job ${job?.id} failed:`, err.message);
-});
+    console.log('\n🚀 Worker started and waiting for conversion jobs...');
+    console.log('   Concurrency: 2 jobs');
+    console.log('   Queue: PostgreSQL (pg-boss)');
+    console.log('   Supported conversions:');
+    console.log('   - Images: HEIC/HEIF/WebP → JPEG');
+    console.log('   - RAW: CR2/NEF/ARW/DNG → TIFF');
+    console.log('   - Videos: MP4/MOV/AVI → WebM (VP9+Opus)');
+    console.log('   - Audio: MP3/AAC/M4A → Ogg Vorbis');
+    console.log('');
 
-worker.on('error', (err) => {
-  console.error('❌ Worker error:', err);
-});
+    // Start processing jobs
+    // pg-boss handles concurrency automatically based on teamSize
+    await boss.work('file-conversion', processConversionJob);
 
-console.log('🚀 Worker started and waiting for conversion jobs...');
-console.log('   Concurrency: 2 jobs');
-console.log('   Supported conversions:');
-console.log('   - Images: HEIC/HEIF/WebP → JPEG');
-console.log('   - RAW: CR2/NEF/ARW/DNG → TIFF');
-console.log('   - Videos: MP4/MOV/AVI → WebM (VP9+Opus)');
-console.log('   - Audio: MP3/AAC/M4A → Ogg Vorbis');
-console.log('');
+    console.log('✓ Worker is now processing jobs...\n');
+  } catch (error) {
+    console.error('Failed to start worker:', error);
+    process.exit(1);
+  }
+}
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   console.log('\nSIGTERM signal received: closing worker');
-  await worker.close();
+  await boss.stop();
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
   console.log('\nSIGINT signal received: closing worker');
-  await worker.close();
+  await boss.stop();
   process.exit(0);
 });
+
+// Handle uncaught errors
+process.on('unhandledRejection', (error) => {
+  console.error('Unhandled rejection:', error);
+});
+
+// Start the worker
+startWorker();
 

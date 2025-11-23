@@ -51,12 +51,11 @@ Services Layer
     ├── ConversionService (FFmpeg/ImageMagick)
     ├── DatabaseService (PostgreSQL operations)
     ├── MinioService (Object storage)
-    └── QueueService (BullMQ jobs)
+    └── QueueService (pg-boss jobs)
     ↓
 Infrastructure
-    ├── PostgreSQL (File metadata)
+    ├── PostgreSQL (File metadata + Job queue)
     ├── MinIO (Raw & processed files)
-    ├── Redis (Job queue)
     └── FFmpeg/ImageMagick (Conversion engines)
     ↓
 Worker (Background processing)
@@ -99,7 +98,7 @@ pnpm install
 docker-compose up -d
 ```
 
-This starts PostgreSQL, MinIO, Redis, and the converter container.
+This starts PostgreSQL, MinIO, and the converter container.
 
 4. **Run database migration:**
 
@@ -185,9 +184,6 @@ MINIO_PORT=9000
 MINIO_ACCESS_KEY=minioadmin
 MINIO_SECRET_KEY=minioadmin
 MINIO_USE_SSL=false
-
-REDIS_HOST=localhost
-REDIS_PORT=6379
 ```
 
 ### Worker Concurrency
@@ -248,27 +244,29 @@ docker-compose down -v
 - **Application:** http://localhost:3000
 - **MinIO Console:** http://localhost:9001 (minioadmin/minioadmin)
 - **PostgreSQL:** localhost:5432
-- **Redis:** localhost:6379
 
 ## 🔍 Monitoring
 
 ### Check Queue Status
 
 ```bash
-# Connect to Redis
-docker exec kowiz-redis redis-cli
+# Connect to PostgreSQL
+PGPASSWORD=postgres psql -h localhost -U postgres -d kowiz
 
 # Check waiting jobs
-LLEN bull:file-conversion:wait
+SELECT COUNT(*) FROM pgboss.job WHERE name = 'file-conversion' AND state = 'created';
 
 # Check active jobs
-LLEN bull:file-conversion:active
+SELECT COUNT(*) FROM pgboss.job WHERE name = 'file-conversion' AND state = 'active';
 
 # Check completed
-LLEN bull:file-conversion:completed
+SELECT COUNT(*) FROM pgboss.job WHERE name = 'file-conversion' AND state = 'completed';
 
 # Check failed
-LLEN bull:file-conversion:failed
+SELECT COUNT(*) FROM pgboss.job WHERE name = 'file-conversion' AND state = 'failed';
+
+# View all job states
+SELECT state, COUNT(*) FROM pgboss.job WHERE name = 'file-conversion' GROUP BY state;
 ```
 
 ### Check Database
@@ -393,6 +391,15 @@ Upload files with different formats:
 3. Click "Retry Conversion"
 4. Verify retry count increments
 
+## 🎯 Key Benefits of pg-boss
+
+- ✅ **Simpler Infrastructure** - One less Docker container (no Redis needed)
+- ✅ **Built-in Persistence** - Jobs survive crashes automatically
+- ✅ **Transactional Safety** - Queue operations can use PostgreSQL transactions
+- ✅ **Unified Backup** - One database backup includes everything
+- ✅ **SQL Monitoring** - Query jobs using standard SQL
+- ✅ **Lower Cost** - Fewer services to run and manage
+
 ## 🚨 Troubleshooting
 
 ### "No conversion needed" but file not supported
@@ -426,6 +433,16 @@ This means the database has records but files are missing from MinIO (orphaned r
 ```bash
 # Clean up orphaned records
 curl -X POST http://localhost:3000/api/files/cleanup-orphaned
+```
+
+### Jobs stuck in queue
+
+```bash
+# Check pg-boss jobs
+PGPASSWORD=postgres psql -h localhost -U postgres -d kowiz -c "SELECT * FROM pgboss.job WHERE state = 'failed' LIMIT 5;"
+
+# Retry failed jobs (will be picked up on next worker start)
+# Or use the UI retry button
 ```
 
 ### Docker network issues
@@ -496,7 +513,7 @@ pnpm drizzle-kit push
 - Drizzle ORM
 - PostgreSQL 16
 - MinIO (S3-compatible storage)
-- BullMQ + Redis
+- pg-boss (PostgreSQL-based queue)
 
 **Conversion:**
 - FFmpeg 8.0

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -52,19 +50,6 @@ services:
       exit 0;
       "
 
-  redis:
-    image: redis:7-alpine
-    container_name: kowiz-redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
   converter:
     image: jrottenberg/ffmpeg:latest
     container_name: kowiz-converter
@@ -76,6 +61,5 @@ services:
 volumes:
   postgres_data:
   minio_data:
-  redis_data:
   converter_temp:
 

@@ -1,9 +1,6 @@
-import { Queue, QueueOptions } from 'bullmq';
+import { PgBoss } from 'pg-boss';
 
-const connection = {
-  host: process.env.REDIS_HOST || 'localhost',
-  port: Number(process.env.REDIS_PORT) || 6379,
-};
+const connectionString = `postgresql://${process.env.DATABASE_USER || 'postgres'}:${process.env.DATABASE_PASSWORD || 'postgres'}@${process.env.DATABASE_HOST || 'localhost'}:${process.env.DATABASE_PORT || 5432}/${process.env.DATABASE_NAME || 'kowiz'}`;
 
 export interface ConversionJobData {
   fileId: string;
@@ -12,28 +9,42 @@ export interface ConversionJobData {
 }
 
 export class QueueService {
-  private conversionQueue: Queue<ConversionJobData>;
+  private boss: PgBoss;
+  private started: boolean = false;
 
   constructor() {
-    const queueOptions: QueueOptions = {
-      connection,
-    };
+    this.boss = new PgBoss(connectionString);
+  }
 
-    this.conversionQueue = new Queue<ConversionJobData>('file-conversion', queueOptions);
+  async start(): Promise<void> {
+    if (!this.started) {
+      await this.boss.start();
+      this.started = true;
+      console.log('✓ pg-boss queue started');
+    }
+  }
+
+  async stop(): Promise<void> {
+    if (this.started) {
+      await this.boss.stop();
+      this.started = false;
+      console.log('✓ pg-boss queue stopped');
+    }
   }
 
   async addConversionJob(jobData: ConversionJobData): Promise<void> {
-    await this.conversionQueue.add('convert-heic', jobData, {
-      attempts: 3,
-      backoff: {
-        type: 'exponential',
-        delay: 2000,
-      },
+    await this.start();
+    
+    await this.boss.send('file-conversion', jobData, {
+      retryLimit: 3,
+      retryDelay: 2,
+      retryBackoff: true,
+      expireInSeconds: 60 * 60, // 1 hour
     });
   }
 
-  async getQueue() {
-    return this.conversionQueue;
+  getBoss(): PgBoss {
+    return this.boss;
   }
 }
 
