@@ -47,6 +47,9 @@ RUN ffmpeg -version && \
     yt-dlp --version && \
     convert -version
 
+# Enable pnpm BEFORE creating user (needs root)
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 worker
 
@@ -56,13 +59,11 @@ COPY --from=deps /app/node_modules ./node_modules
 # Copy application code
 COPY --chown=worker:nodejs . .
 
-USER worker
-
-# Enable pnpm for the runner
-RUN corepack enable && corepack prepare pnpm@latest --activate
-
 # Create temp directories with proper permissions
-RUN mkdir -p /tmp/kowiz-conversions /tmp/kowiz-downloads
+RUN mkdir -p /tmp/kowiz-conversions /tmp/kowiz-downloads && \
+    chown -R worker:nodejs /tmp/kowiz-conversions /tmp/kowiz-downloads
+
+USER worker
 
 CMD ["pnpm", "exec", "tsx", "worker.ts"]
 
