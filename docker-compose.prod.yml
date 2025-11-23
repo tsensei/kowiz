@@ -76,7 +76,6 @@ services:
       - kowiz-network
     restart: "no"
 
-services:
   web:
     image: ${REGISTRY_URL}/kowiz-web:latest
     container_name: kowiz-web-prod
