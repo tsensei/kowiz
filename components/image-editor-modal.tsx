@@ -2,6 +2,10 @@
 
 import React from 'react';
 import FilerobotImageEditor from 'react-filerobot-image-editor';
+import Konva from 'konva';
+
+// Fix for low quality preview - using 3 instead of 10 to avoid performance issues
+Konva.pixelRatio = 3;
 
 
 interface ImageEditorModalProps {
@@ -54,6 +58,7 @@ export default function ImageEditorModal({
                     defaultToolId="Crop"
                     savingPixelRatio={1}
                     previewPixelRatio={1}
+                    defaultSavedImageQuality={1}
                 />
             </div>
         </div>
