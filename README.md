@@ -1,0 +1,618 @@
+# KOWiz - Wikimedia Commons Media Converter
+
+Automatic media conversion system for Wikimedia Commons. Upload any media file and KOWiz converts it to Commons-compatible formats with a clean, modern interface.
+
+## ✨ Features
+
+- **🎯 Smart Format Detection** - Automatically detects and categorizes media files (image/video/audio/RAW)
+- **🔄 Auto Conversion** - Converts unsupported formats to Commons-compatible formats using FFmpeg and ImageMagick
+- **📤 Drag & Drop Upload** - Modern upload interface with multi-file and folder support
+- **⚡ Background Processing** - BullMQ queue system with concurrent workers
+- **📊 Real-time Monitoring** - Live progress tracking with auto-refresh
+- **💾 Dual Storage** - Preserves original files and stores converted versions in MinIO
+- **🔁 Automatic Retry** - Failed conversions retry up to 3 times automatically
+- **📱 Responsive Design** - Clean, spacious UI with tab-based navigation
+- **🛡️ Atomic Operations** - Automatic rollback on failures, no orphaned records
+
+## 🎯 Supported Conversions
+
+### Images
+- **HEIC/HEIF → JPEG** (Apple Photos format)
+- **WebP → JPEG** (Modern web format)
+- **BMP → JPEG** (Legacy bitmap)
+
+### RAW Formats
+- **CR2/NEF/ARW/DNG/RW2 → TIFF** (Preserves quality)
+- Supports: Canon, Nikon, Sony, Adobe, Panasonic, Olympus, Fujifilm
+
+### Videos
+- **MP4/MOV/AVI/MKV → WebM** (VP9 + Opus codec)
+- Optimized for Wikimedia Commons requirements
+- Max resolution: 1920x1080, preserves aspect ratio
+
+### Audio
+- **MP3/AAC/M4A → Ogg Vorbis** (Commons standard)
+- Quality level 6 (balanced quality/size)
+
+### Already Supported (No Conversion)
+- **Images:** JPEG, PNG, GIF, SVG, TIFF
+- **Videos:** WebM, OGV
+- **Audio:** OGG, OPUS, WAV, FLAC
+
+## 🏗️ Architecture
+
+```
+Frontend (Next.js 16)
+    ↓
+API Routes (Upload, Files, Download, Retry)
+    ↓
+Services Layer
+    ├── FormatDetectionService (Smart categorization)
+    ├── ConversionService (FFmpeg/ImageMagick)
+    ├── DatabaseService (PostgreSQL operations)
+    ├── MinioService (Object storage)
+    └── QueueService (BullMQ jobs)
+    ↓
+Infrastructure
+    ├── PostgreSQL (File metadata)
+    ├── MinIO (Raw & processed files)
+    ├── Redis (Job queue)
+    └── FFmpeg/ImageMagick (Conversion engines)
+    ↓
+Worker (Background processing)
+```
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- **Node.js** 20+
+- **pnpm** package manager
+- **Docker** & Docker Compose
+- **FFmpeg** (for media conversion)
+
+### Installation
+
+1. **Install FFmpeg and ImageMagick:**
+
+```bash
+# macOS
+brew install ffmpeg imagemagick
+
+# Ubuntu/Debian
+sudo apt update && sudo apt install ffmpeg imagemagick
+
+# Verify installation
+ffmpeg -version
+```
+
+2. **Clone and install dependencies:**
+
+```bash
+cd kowiz
+pnpm install
+```
+
+3. **Start Docker services:**
+
+```bash
+docker-compose up -d
+```
+
+This starts PostgreSQL, MinIO, Redis, and the converter container.
+
+4. **Run database migration:**
+
+```bash
+pnpm drizzle-kit push
+```
+
+5. **Start the development server:**
+
+```bash
+pnpm dev
+```
+
+6. **Start the worker (in a new terminal):**
+
+```bash
+pnpm worker
+```
+
+7. **Open the application:**
+
+```
+http://localhost:3000
+```
+
+## 🎬 Usage
+
+### Upload Tab
+1. Drag and drop files or click to browse
+2. Click "Upload Folder" for bulk uploads
+3. View quick stats and recently uploaded files
+
+### Queue Tab
+4. Monitor active conversions with real-time progress
+5. See queued files waiting for processing
+6. View and retry any failed conversions
+
+### Completed Tab
+7. Browse all successfully converted files
+8. Search and filter your files
+9. Download both original and converted versions
+
+## 📊 Database Schema
+
+```sql
+CREATE TABLE files (
+  id                  UUID PRIMARY KEY,
+  name                VARCHAR(255) NOT NULL,
+  size                BIGINT NOT NULL,
+  mime_type           VARCHAR(100) NOT NULL,
+  category            VARCHAR(50) NOT NULL,        -- image/video/audio/raw
+  original_format     VARCHAR(50) NOT NULL,        -- heic, mp4, mp3
+  target_format       VARCHAR(50),                 -- jpeg, webm, ogg
+  needs_conversion    VARCHAR(10) DEFAULT 'true',
+  converted_size      BIGINT,
+  raw_file_path       VARCHAR(500) NOT NULL,
+  processed_file_path VARCHAR(500),
+  status              VARCHAR(50) DEFAULT 'pending',
+  error_message       TEXT,
+  retry_count         BIGINT DEFAULT 0,
+  created_at          TIMESTAMP DEFAULT NOW(),
+  updated_at          TIMESTAMP DEFAULT NOW(),
+  converted_at        TIMESTAMP,
+  uploaded_at         TIMESTAMP
+);
+```
+
+## 🔧 Configuration
+
+### Environment Variables
+
+Create `.env.local`:
+
+```bash
+DATABASE_HOST=localhost
+DATABASE_PORT=5432
+DATABASE_USER=postgres
+DATABASE_PASSWORD=postgres
+DATABASE_NAME=kowiz
+
+MINIO_ENDPOINT=localhost
+MINIO_PORT=9000
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=minioadmin
+MINIO_USE_SSL=false
+
+REDIS_HOST=localhost
+REDIS_PORT=6379
+```
+
+### Worker Concurrency
+
+Adjust in `worker.ts`:
+
+```typescript
+{ connection, concurrency: 2 } // 2-4 recommended based on CPU cores
+```
+
+### Conversion Quality
+
+Adjust in `lib/services/conversion.service.ts`:
+
+```typescript
+// Images
+-quality 95  // 85-95 recommended
+
+// Videos
+-crf 30      // 25-35 (lower = better quality, slower)
+-b:v 2M      // 1M-4M bitrate
+```
+
+## 🛠️ Scripts
+
+```bash
+pnpm dev          # Start Next.js dev server
+pnpm build        # Build for production
+pnpm start        # Start production server
+pnpm worker       # Start background worker
+pnpm lint         # Run ESLint
+
+# Drizzle ORM
+pnpm drizzle-kit generate  # Generate migration
+pnpm drizzle-kit push      # Apply migration
+```
+
+## 🐳 Docker Services
+
+```bash
+# Start all services
+docker-compose up -d
+
+# Stop all services
+docker-compose down
+
+# View logs
+docker logs kowiz-postgres
+docker logs kowiz-minio
+docker logs kowiz-redis
+
+# Reset all data
+docker-compose down -v
+```
+
+### Service URLs
+
+- **Application:** http://localhost:3000
+- **MinIO Console:** http://localhost:9001 (minioadmin/minioadmin)
+- **PostgreSQL:** localhost:5432
+- **Redis:** localhost:6379
+
+## 🔍 Monitoring
+
+### Check Queue Status
+
+```bash
+# Connect to Redis
+docker exec kowiz-redis redis-cli
+
+# Check waiting jobs
+LLEN bull:file-conversion:wait
+
+# Check active jobs
+LLEN bull:file-conversion:active
+
+# Check completed
+LLEN bull:file-conversion:completed
+
+# Check failed
+LLEN bull:file-conversion:failed
+```
+
+### Check Database
+
+```bash
+# Connect to PostgreSQL
+PGPASSWORD=postgres psql -h localhost -U postgres -d kowiz
+
+# View all files
+SELECT name, category, status FROM files;
+
+# Count by status
+SELECT status, COUNT(*) FROM files GROUP BY status;
+
+# View failed files
+SELECT name, error_message FROM files WHERE status = 'failed';
+```
+
+### Check Storage
+
+Open MinIO Console at http://localhost:9001 and check:
+- **raw-files** bucket - Original uploaded files
+- **processed-files** bucket - Converted files
+
+## 🛡️ Error Handling & Resilience
+
+### Automatic Rollback
+
+The upload process implements atomic-like behavior:
+
+1. **Database record created** → If MinIO fails: DB record deleted
+2. **File uploaded to MinIO** → If queue fails: MinIO file + DB record deleted
+3. **Job added to queue** → If status update fails: Continue (worker processes anyway)
+
+**Result:** No orphaned records or files
+
+### Retry Mechanism
+
+- **Automatic:** Up to 3 retry attempts with exponential backoff
+- **Manual:** Retry button in UI after automatic attempts exhausted
+- **Tracking:** Retry count stored in database
+
+### Recovery Utilities
+
+**Clean up orphaned records:**
+```bash
+curl -X POST http://localhost:3000/api/files/cleanup-orphaned
+```
+
+**Requeue pending files:**
+```bash
+curl -X POST http://localhost:3000/api/files/requeue-pending
+```
+
+## 📁 Project Structure
+
+```
+kowiz/
+├── app/
+│   ├── api/
+│   │   ├── files/
+│   │   │   ├── route.ts                    # GET all files
+│   │   │   ├── [id]/download/route.ts      # Download files
+│   │   │   ├── [id]/retry/route.ts         # Retry conversion
+│   │   │   ├── cleanup-orphaned/route.ts   # Cleanup utility
+│   │   │   └── requeue-pending/route.ts    # Requeue utility
+│   │   └── upload/route.ts                 # Upload endpoint
+│   ├── layout.tsx
+│   └── page.tsx                            # Main UI with tabs
+├── components/
+│   ├── ui/                                 # shadcn/ui components
+│   ├── upload-tab.tsx                      # Upload interface
+│   ├── queue-tab.tsx                       # Active monitoring
+│   ├── completed-tab.tsx                   # Download interface
+│   ├── file-dropzone.tsx                   # Drag-drop upload
+│   └── file-card.tsx                       # File status card
+├── lib/
+│   ├── db/
+│   │   ├── index.ts                        # Database connection
+│   │   ├── schema.ts                       # Drizzle schema
+│   │   └── migrations/                     # Migration files
+│   └── services/
+│       ├── database.service.ts             # DB operations
+│       ├── minio.service.ts                # Object storage
+│       ├── queue.service.ts                # Job queue
+│       ├── format-detection.service.ts     # Format detection
+│       └── conversion.service.ts           # Media conversion
+├── worker.ts                               # Background worker
+├── docker-compose.yml                      # Infrastructure
+├── drizzle.config.ts                       # ORM config
+└── package.json                            # Dependencies
+```
+
+## 🧪 Testing
+
+### Test Format Detection
+
+Upload files with different formats:
+- ✅ HEIC → Should convert to JPEG
+- ✅ MP4 → Should convert to WebM  
+- ✅ MP3 → Should convert to OGG
+- ✅ JPEG → Should skip conversion
+
+### Test Bulk Upload
+
+1. Click "Upload Folder"
+2. Select folder with 10+ mixed media files
+3. Watch concurrent processing (2 at a time)
+4. Verify all complete successfully
+
+### Test Error Recovery
+
+1. Stop worker
+2. Upload files (they'll queue)
+3. Restart worker
+4. Files should process automatically
+
+### Test Retry
+
+1. Upload a corrupt/invalid file
+2. Check Failed tab
+3. Click "Retry Conversion"
+4. Verify retry count increments
+
+## 🚨 Troubleshooting
+
+### "No conversion needed" but file not supported
+
+The file is already in a Commons-supported format (JPEG, PNG, etc.). No conversion required.
+
+### Worker not processing files
+
+```bash
+# Check worker is running
+ps aux | grep tsx
+
+# Check Redis connection
+docker exec kowiz-redis redis-cli PING
+
+# Restart worker
+pnpm worker
+```
+
+### Files stuck in "pending" status
+
+```bash
+# Requeue pending files
+curl -X POST http://localhost:3000/api/files/requeue-pending
+```
+
+### "The specified key does not exist" error
+
+This means the database has records but files are missing from MinIO (orphaned records).
+
+```bash
+# Clean up orphaned records
+curl -X POST http://localhost:3000/api/files/cleanup-orphaned
+```
+
+### Docker network issues
+
+```bash
+docker network prune -f
+docker-compose down
+docker-compose up -d
+```
+
+### Reset everything
+
+```bash
+# Stop and remove all containers and volumes
+docker-compose down -v
+
+# Restart
+docker-compose up -d
+pnpm drizzle-kit push
+```
+
+## 📈 Performance
+
+### Typical Conversion Times
+
+| Type | Size | Time |
+|------|------|------|
+| HEIC → JPEG | 5 MB | 2-5s |
+| RAW → TIFF | 25 MB | 5-10s |
+| MP4 → WebM | 100 MB | 30-60s |
+| MP3 → OGG | 5 MB | 3-5s |
+
+### Optimization
+
+**Increase concurrency:**
+```typescript
+// worker.ts
+{ connection, concurrency: 4 }  // Based on CPU cores
+```
+
+**Reduce quality for faster processing:**
+```typescript
+// conversion.service.ts
+-quality 85    // Instead of 95 for images
+-crf 35        // Instead of 30 for videos
+```
+
+## 🔐 Security Notes
+
+- MinIO buckets are private by default
+- Download URLs expire after 1 hour
+- Files accessible only via presigned URLs
+- No direct MinIO access from frontend
+
+## 🛠️ Tech Stack
+
+**Frontend:**
+- Next.js 16 (App Router)
+- React 19
+- TypeScript
+- Tailwind CSS
+- shadcn/ui components
+- react-dropzone
+- @tanstack/react-table
+
+**Backend:**
+- Next.js API Routes
+- Drizzle ORM
+- PostgreSQL 16
+- MinIO (S3-compatible storage)
+- BullMQ + Redis
+
+**Conversion:**
+- FFmpeg 8.0
+- ImageMagick (optional)
+
+**Infrastructure:**
+- Docker Compose
+- Node.js 20+
+
+## 📝 API Endpoints
+
+### Upload Files
+```typescript
+POST /api/upload
+Body: FormData with 'files' field (multiple files)
+Response: { success, results, totalFiles, successfulUploads, failedUploads }
+```
+
+### Get All Files
+```typescript
+GET /api/files
+Response: { files: File[] }
+```
+
+### Download File
+```typescript
+GET /api/files/[id]/download?type=raw|converted
+Response: { downloadUrl, fileName, expiresIn }
+```
+
+### Retry Conversion
+```typescript
+POST /api/files/[id]/retry
+Response: { success, message }
+```
+
+### Utilities
+```typescript
+POST /api/files/cleanup-orphaned    # Clean orphaned records
+POST /api/files/requeue-pending     # Requeue pending files
+```
+
+## 🎨 UI Components
+
+### Three Main Tabs
+
+1. **Upload** - Focused upload experience with stats
+2. **Queue** - Active monitoring of processing files
+3. **Completed** - Browse and download converted files
+
+### Key Features
+- Drag & drop zone
+- Folder upload support
+- Real-time progress bars
+- Status filtering
+- Search functionality
+- Download buttons
+
+## 🚀 Production Deployment
+
+### Using PM2
+
+```bash
+# Install PM2
+pnpm add -g pm2
+
+# Start Next.js
+pm2 start "pnpm start" --name kowiz-web
+
+# Start Worker
+pm2 start tsx --name kowiz-worker -- worker.ts
+
+# Save configuration
+pm2 save
+pm2 startup
+
+# Monitor
+pm2 monit
+```
+
+### Environment Variables
+
+Ensure all required environment variables are set in production. Never commit `.env.local` to git.
+
+### Resource Requirements
+
+**Minimum:**
+- 2 CPU cores
+- 4 GB RAM
+- 20 GB storage
+
+**Recommended:**
+- 4 CPU cores
+- 8 GB RAM
+- 100+ GB storage
+
+## 📄 License
+
+MIT
+
+## 🤝 Contributing
+
+Contributions welcome! Please ensure:
+- Code passes `pnpm build`
+- Follow existing code style
+- Add tests for new features
+- Update documentation
+
+## 🆘 Support
+
+For issues or questions:
+1. Check this README
+2. Review worker logs: `pnpm worker`
+3. Check Docker logs: `docker-compose logs`
+4. Verify all services running: `docker ps`
+
+---
+
+**Built with ❤️ for Wikimedia Commons contributors**
