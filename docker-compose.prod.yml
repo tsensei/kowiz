@@ -1,26 +1,96 @@
-# Production deployment for Coolify
-# This assumes Coolify provides PostgreSQL and MinIO services
-# Or you can include them here if self-hosting everything
+# Production deployment with self-hosted infrastructure
+# Includes PostgreSQL, MinIO, Web, Worker, and Migration
 
-# IMPORTANT: Run database migrations BEFORE starting these services!
-# Method 1: docker exec kowiz-web pnpm drizzle-kit push
-# Method 2: ./scripts/migrate.sh (set env vars first)
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: kowiz-postgres-prod
+    environment:
+      POSTGRES_USER: ${DATABASE_USER:-postgres}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      POSTGRES_DB: ${DATABASE_NAME:-kowiz}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - kowiz-network
+
+  minio:
+    image: minio/minio:latest
+    container_name: kowiz-minio-prod
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - kowiz-network
+
+  minio-setup:
+    image: minio/mc:latest
+    container_name: kowiz-minio-setup-prod
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set myminio http://minio:9000 ${MINIO_ACCESS_KEY} ${MINIO_SECRET_KEY};
+      mc mb myminio/raw-files --ignore-existing;
+      mc mb myminio/processed-files --ignore-existing;
+      mc anonymous set download myminio/raw-files;
+      mc anonymous set download myminio/processed-files;
+      exit 0;
+      "
+    networks:
+      - kowiz-network
+
+  migrate:
+    image: ${REGISTRY_URL}/kowiz-worker:latest
+    container_name: kowiz-migrate-prod
+    environment:
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USER: ${DATABASE_USER:-postgres}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      DATABASE_NAME: ${DATABASE_NAME:-kowiz}
+    command: sh -c "sleep 10 && pnpm drizzle-kit push"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - kowiz-network
+    restart: "no"
 
 services:
   web:
     image: ${REGISTRY_URL}/kowiz-web:latest
-    container_name: kowiz-web
+    container_name: kowiz-web-prod
     environment:
-      DATABASE_HOST: ${DATABASE_HOST}
-      DATABASE_PORT: ${DATABASE_PORT:-5432}
-      DATABASE_USER: ${DATABASE_USER}
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USER: ${DATABASE_USER:-postgres}
       DATABASE_PASSWORD: ${DATABASE_PASSWORD}
       DATABASE_NAME: ${DATABASE_NAME:-kowiz}
-      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
-      MINIO_PORT: ${MINIO_PORT:-9000}
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
-      MINIO_USE_SSL: ${MINIO_USE_SSL:-false}
+      MINIO_USE_SSL: false
       NODE_ENV: production
     ports:
       - "${PORT:-3000}:3000"
@@ -31,79 +101,49 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - kowiz-network
 
   worker:
     image: ${REGISTRY_URL}/kowiz-worker:latest
-    container_name: kowiz-worker
+    container_name: kowiz-worker-prod
     environment:
-      DATABASE_HOST: ${DATABASE_HOST}
-      DATABASE_PORT: ${DATABASE_PORT:-5432}
-      DATABASE_USER: ${DATABASE_USER}
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USER: ${DATABASE_USER:-postgres}
       DATABASE_PASSWORD: ${DATABASE_PASSWORD}
       DATABASE_NAME: ${DATABASE_NAME:-kowiz}
-      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
-      MINIO_PORT: ${MINIO_PORT:-9000}
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
-      MINIO_USE_SSL: ${MINIO_USE_SSL:-false}
+      MINIO_USE_SSL: false
       NODE_ENV: production
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - kowiz-network
     deploy:
       replicas: 2  # Run 2 worker instances for better throughput
 
-# If you want to include PostgreSQL and MinIO (self-hosted):
-# Uncomment the following services
+networks:
+  kowiz-network:
+    driver: bridge
 
-  # postgres:
-  #   image: postgres:16-alpine
-  #   container_name: kowiz-postgres
-  #   environment:
-  #     POSTGRES_USER: ${DATABASE_USER}
-  #     POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
-  #     POSTGRES_DB: ${DATABASE_NAME:-kowiz}
-  #   volumes:
-  #     - postgres_data:/var/lib/postgresql/data
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER}"]
-  #     interval: 5s
-  #     timeout: 5s
-  #     retries: 5
-  #   restart: unless-stopped
-
-  # minio:
-  #   image: minio/minio:latest
-  #   container_name: kowiz-minio
-  #   command: server /data --console-address ":9001"
-  #   environment:
-  #     MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
-  #     MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
-  #   volumes:
-  #     - minio_data:/data
-  #   ports:
-  #     - "9000:9000"
-  #     - "9001:9001"
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-  #     interval: 5s
-  #     timeout: 5s
-  #     retries: 5
-  #   restart: unless-stopped
-
-  # minio-setup:
-  #   image: minio/mc:latest
-  #   container_name: kowiz-minio-setup
-  #   depends_on:
-  #     minio:
-  #       condition: service_healthy
-  #   entrypoint: >
-  #     /bin/sh -c "
-  #     mc alias set myminio http://minio:9000 ${MINIO_ACCESS_KEY} ${MINIO_SECRET_KEY};
-  #     mc mb myminio/raw-files --ignore-existing;
-  #     mc mb myminio/processed-files --ignore-existing;
-  #     exit 0;
-  #     "
-
-# volumes:
-#   postgres_data:
-#   minio_data:
+volumes:
+  postgres_data:
+  minio_data:
 

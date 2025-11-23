@@ -115,32 +115,27 @@ docker-compose -f docker-compose.local.yml down -v
 
 ---
 
-## ☁️ Coolify Deployment
+## ☁️ Coolify Deployment (Self-Hosted Infrastructure)
 
-### Prerequisites in Coolify
+### Prerequisites
 
-1. **PostgreSQL Database** - Create a PostgreSQL service
-2. **MinIO Service** - Create a MinIO service (or use external S3)
-3. **Docker Registry** - Your self-hosted registry accessible
+1. **Docker Registry** - Your self-hosted registry with pushed images
+2. **Server** - Linux server with Docker and Docker Compose
+3. **Domain** (optional) - For HTTPS access
 
 ### Step 1: Prepare Environment Variables
 
-Create a `.env` file for Coolify with:
+Create a `.env.production` file on your server with:
 
 ```bash
-# Database (from Coolify PostgreSQL service)
-DATABASE_HOST=postgres-kowiz.internal
-DATABASE_PORT=5432
+# Database (self-hosted in Docker)
 DATABASE_USER=postgres
-DATABASE_PASSWORD=your-db-password
+DATABASE_PASSWORD=change-this-secure-password
 DATABASE_NAME=kowiz
 
-# MinIO (from Coolify MinIO service or external)
-MINIO_ENDPOINT=minio-kowiz.internal
-MINIO_PORT=9000
-MINIO_ACCESS_KEY=your-minio-key
-MINIO_SECRET_KEY=your-minio-secret
-MINIO_USE_SSL=false
+# MinIO (self-hosted in Docker)
+MINIO_ACCESS_KEY=change-this-access-key
+MINIO_SECRET_KEY=change-this-secret-key
 
 # Registry (for pulling images)
 REGISTRY_URL=registry.yourdomain.com
@@ -150,61 +145,75 @@ PORT=3000
 NODE_ENV=production
 ```
 
-### Step 2: Create Coolify Project
+**Note:** `DATABASE_HOST` and `MINIO_ENDPOINT` are set to service names in the compose file.
 
-1. **New Project** in Coolify
-2. **Add Resource → Docker Compose**
-3. **Upload** `docker-compose.prod.yml`
-4. **Set Environment Variables** from above
-5. **Deploy**
-
-### Step 3: Run Database Migration
-
-**Option A: Using Coolify Console**
+### Step 2: Upload Files to Server
 
 ```bash
-# Connect to web container
-docker exec -it kowiz-web sh
+# Copy compose file and env to your server
+scp docker-compose.prod.yml user@your-server:/opt/kowiz/
+scp .env.production user@your-server:/opt/kowiz/.env
 
-# Run migration
-pnpm drizzle-kit push
+# SSH into server
+ssh user@your-server
+cd /opt/kowiz
 ```
 
-**Option B: Using Migration Script**
+### Step 3: Login to Docker Registry
 
 ```bash
-# On your server
-cd /path/to/kowiz
-export DATABASE_HOST=...
-export DATABASE_PORT=5432
-export DATABASE_USER=postgres
-export DATABASE_PASSWORD=...
-export DATABASE_NAME=kowiz
-
-chmod +x scripts/migrate.sh
-./scripts/migrate.sh
+# Login to your registry
+docker login registry.yourdomain.com
+# Enter your username and password
 ```
 
-### Step 4: Setup MinIO Buckets
+### Step 4: Deploy All Services
 
 ```bash
-# On your server
-export MINIO_ENDPOINT=...
-export MINIO_PORT=9000
-export MINIO_ACCESS_KEY=...
-export MINIO_SECRET_KEY=...
+# Pull latest images
+docker-compose -f docker-compose.prod.yml pull
 
-chmod +x scripts/setup-minio.sh
-./scripts/setup-minio.sh
+# Start all services (includes automatic migration)
+docker-compose -f docker-compose.prod.yml up -d
+
+# This will start in order:
+# 1. PostgreSQL
+# 2. MinIO + bucket setup
+# 3. Migration (runs once and exits)
+# 4. Web application
+# 5. Worker (2 instances)
 ```
 
 ### Step 5: Verify Deployment
 
-1. **Check Web App**: https://your-domain.com
-2. **Upload Test File**: Upload a small image
-3. **Check Worker Logs**: `docker logs kowiz-worker`
-4. **Verify Database**: Check file records
-5. **Check MinIO**: Verify files in buckets
+```bash
+# Check all services are running
+docker-compose -f docker-compose.prod.yml ps
+
+# Should show:
+# ✓ kowiz-postgres-prod     - running
+# ✓ kowiz-minio-prod        - running
+# ✓ kowiz-web-prod          - running
+# ✓ kowiz-worker-prod-1     - running
+# ✓ kowiz-worker-prod-2     - running
+# ✓ kowiz-migrate-prod      - exited (0)
+# ✓ kowiz-minio-setup-prod  - exited (0)
+
+# Check web app
+curl http://localhost:3000/api/files
+
+# Check MinIO console
+open http://localhost:9001
+# Login: your MINIO_ACCESS_KEY / MINIO_SECRET_KEY
+
+# View logs
+docker-compose -f docker-compose.prod.yml logs -f web
+docker-compose -f docker-compose.prod.yml logs -f worker
+```
+
+### Step 6: Configure Reverse Proxy (Optional)
+
+If you want HTTPS and a domain, configure nginx or Caddy. See [Reverse Proxy Setup](#reverse-proxy-setup-nginx) section below.
 
 ---
 
