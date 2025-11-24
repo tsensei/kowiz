@@ -24,7 +24,7 @@ const CONVERSION_MAP: Record<string, { category: MediaCategory; target: string }
   webp: { category: 'image', target: 'jpeg' },
   bmp: { category: 'image', target: 'jpeg' },
   tga: { category: 'image', target: 'jpeg' },
-  
+
   // RAW formats - Convert to TIFF (preserve quality) or JPEG
   cr2: { category: 'raw', target: 'tiff' },
   nef: { category: 'raw', target: 'tiff' },
@@ -33,7 +33,8 @@ const CONVERSION_MAP: Record<string, { category: MediaCategory; target: string }
   rw2: { category: 'raw', target: 'tiff' },
   orf: { category: 'raw', target: 'tiff' },
   raf: { category: 'raw', target: 'tiff' },
-  
+  cr3: { category: 'raw', target: 'tiff' },
+
   // Videos - Convert to WebM (VP9 + Opus)
   mp4: { category: 'video', target: 'webm' },
   mov: { category: 'video', target: 'webm' },
@@ -44,7 +45,7 @@ const CONVERSION_MAP: Record<string, { category: MediaCategory; target: string }
   m4v: { category: 'video', target: 'webm' },
   flv: { category: 'video', target: 'webm' },
   wmv: { category: 'video', target: 'webm' },
-  
+
   // Audio - Convert to Ogg Vorbis
   mp3: { category: 'audio', target: 'ogg' },
   aac: { category: 'audio', target: 'ogg' },
@@ -66,10 +67,10 @@ export class FormatDetectionService {
   detectFormat(fileName: string, mimeType: string): FormatInfo {
     const extension = this.getExtension(fileName);
     const category = this.detectCategory(extension, mimeType);
-    
+
     // Check if format needs conversion
     const conversionInfo = CONVERSION_MAP[extension];
-    
+
     if (conversionInfo) {
       return {
         category: conversionInfo.category,
@@ -79,10 +80,10 @@ export class FormatDetectionService {
         isSupported: false,
       };
     }
-    
+
     // Check if format is directly supported
     const isSupported = this.isFormatSupported(extension, category);
-    
+
     return {
       category,
       originalFormat: extension,
@@ -91,7 +92,7 @@ export class FormatDetectionService {
       isSupported,
     };
   }
-  
+
   /**
    * Get file extension from filename
    */
@@ -99,7 +100,7 @@ export class FormatDetectionService {
     const parts = fileName.toLowerCase().split('.');
     return parts.length > 1 ? parts[parts.length - 1] : '';
   }
-  
+
   /**
    * Detect media category from extension and MIME type
    */
@@ -109,25 +110,25 @@ export class FormatDetectionService {
     if (conversionInfo) {
       return conversionInfo.category;
     }
-    
+
     // Check by MIME type
     for (const [prefix, category] of Object.entries(MIME_CATEGORY_MAP)) {
       if (mimeType.startsWith(prefix)) {
         return category;
       }
     }
-    
+
     // Check by extension in supported formats
     for (const [category, formats] of Object.entries(SUPPORTED_FORMATS)) {
       if (formats.includes(extension)) {
         return category as MediaCategory;
       }
     }
-    
+
     // Default to image if unknown
     return 'image';
   }
-  
+
   /**
    * Check if format is directly supported by Wikimedia Commons
    */
@@ -135,7 +136,7 @@ export class FormatDetectionService {
     const supportedFormats = SUPPORTED_FORMATS[category] || [];
     return supportedFormats.includes(extension);
   }
-  
+
   /**
    * Get default conversion target for a category
    */
@@ -148,7 +149,7 @@ export class FormatDetectionService {
     };
     return defaults[category];
   }
-  
+
   /**
    * Get human-readable format name
    */

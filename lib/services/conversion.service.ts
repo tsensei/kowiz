@@ -48,8 +48,9 @@ export class ConversionService {
 
       switch (options.category) {
         case 'image':
-        case 'raw':
           return await this.convertImage(options);
+        case 'raw':
+          return await this.convertRaw(options);
         case 'video':
           return await this.convertVideo(options);
         case 'audio':
@@ -67,6 +68,42 @@ export class ConversionService {
   }
 
   /**
+   * Convert RAW files using dcraw_emu
+   */
+  private async convertRaw(options: ConversionOptions): Promise<ConversionResult> {
+    const { inputPath, outputPath, targetFormat } = options;
+
+    try {
+      // Convert RAW to TIFF using dcraw_emu (from libraw-bin, has better CR3 support)
+      // -T: Write TIFF instead of PPM
+      // -6: 16-bit output
+      // -w: Use camera white balance
+      // -Z -: Output to stdout (then redirect to file)
+      // Creates an everyday, viewable TIFF: 16-bit, sRGB-ish, camera WB, gamma-corrected
+
+      console.log('Converting RAW using dcraw_emu (16-bit, sRGB-ish, camera WB, gamma-corrected)...');
+
+      // Everyday, viewable TIFF: 16-bit, sRGB-ish, camera WB, gamma-corrected
+      await execAsync(`dcraw_emu -T -6 -w -Z - "${inputPath}" > "${outputPath}"`);
+
+      // Verify output exists and has size > 0
+      const stats = await fs.stat(outputPath);
+      if (stats.size === 0) {
+        throw new Error('dcraw_emu produced empty file');
+      }
+
+      return {
+        success: true,
+        outputPath,
+        outputSize: stats.size,
+      };
+    } catch (error) {
+      console.error('RAW conversion failed:', error);
+      throw new Error(`RAW conversion failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
    * Convert image formats using ImageMagick (or FFmpeg as fallback)
    */
   private async convertImage(options: ConversionOptions): Promise<ConversionResult> {
@@ -76,10 +113,10 @@ export class ConversionService {
       // Try ImageMagick first (if available)
       try {
         await execAsync('convert -version');
-        
+
         // ImageMagick conversion
         let command = `convert "${inputPath}"`;
-        
+
         // Quality settings based on target format
         if (targetFormat === 'jpeg' || targetFormat === 'jpg') {
           command += ' -quality 95';
@@ -88,28 +125,28 @@ export class ConversionService {
         } else if (targetFormat === 'tiff') {
           command += ' -compress lzw';
         }
-        
+
         command += ` "${outputPath}"`;
-        
+
         await execAsync(command, { maxBuffer: 50 * 1024 * 1024 }); // 50MB buffer
       } catch (imageMagickError) {
         // Fallback to FFmpeg for image conversion
         console.log('ImageMagick not available, using FFmpeg for image conversion');
-        
+
         let command = `ffmpeg -i "${inputPath}"`;
-        
+
         // Quality settings
         if (targetFormat === 'jpeg' || targetFormat === 'jpg') {
           command += ' -q:v 2'; // High quality JPEG
         }
-        
+
         command += ` -y "${outputPath}"`;
-        
+
         await execAsync(command, { maxBuffer: 50 * 1024 * 1024 });
       }
 
       const stats = await fs.stat(outputPath);
-      
+
       return {
         success: true,
         outputPath,
@@ -144,7 +181,7 @@ export class ConversionService {
       await execAsync(command, { maxBuffer: 100 * 1024 * 1024 }); // 100MB buffer
 
       const stats = await fs.stat(outputPath);
-      
+
       return {
         success: true,
         outputPath,
@@ -172,7 +209,7 @@ export class ConversionService {
       await execAsync(command, { maxBuffer: 50 * 1024 * 1024 }); // 50MB buffer
 
       const stats = await fs.stat(outputPath);
-      
+
       return {
         success: true,
         outputPath,

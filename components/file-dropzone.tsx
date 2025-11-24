@@ -25,7 +25,7 @@ export function FileDropzone({ onUploadSuccess }: FileDropzoneProps) {
     // @ts-ignore - webkitdirectory is not in the types but works
     useFsAccessApi: false, // Use traditional file input for folder support
     accept: {
-      'image/*': ['.jpg', '.jpeg', '.png', '.gif', '.heic', '.heif', '.webp', '.bmp', '.tiff', '.tif', '.cr2', '.nef', '.arw', '.dng', '.rw2', '.orf', '.raf'],
+      'image/*': ['.jpg', '.jpeg', '.png', '.gif', '.heic', '.heif', '.webp', '.bmp', '.tiff', '.tif', '.cr2', '.cr3', '.nef', '.arw', '.dng', '.rw2', '.orf', '.raf'],
       'video/*': ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.ogv', '.m4v', '.flv', '.wmv'],
       'audio/*': ['.mp3', '.wav', '.ogg', '.oga', '.opus', '.flac', '.m4a', '.aac', '.wma'],
     },
@@ -76,12 +76,12 @@ export function FileDropzone({ onUploadSuccess }: FileDropzoneProps) {
           .filter((r: any) => !r.success)
           .map((r: any) => r.fileName)
           .join(', ');
-        
+
         toast.warning(
           `${data.successfulUploads} of ${data.totalFiles} files uploaded. Failed: ${failedFiles}`,
           { duration: 5000 }
         );
-        
+
         // Show individual error details
         data.results.forEach((result: any) => {
           if (!result.success) {
@@ -98,11 +98,11 @@ export function FileDropzone({ onUploadSuccess }: FileDropzoneProps) {
         const failedFileNames = data.results
           .filter((r: any) => !r.success)
           .map((r: any) => r.fileName);
-        
+
         setSelectedFiles((prev) =>
           prev.filter((file) => failedFileNames.includes(file.name))
         );
-        
+
         // If all uploaded successfully, reset file input
         if (failedFileNames.length === 0) {
           const fileInput = document.getElementById('file-input') as HTMLInputElement;
@@ -173,7 +173,7 @@ export function FileDropzone({ onUploadSuccess }: FileDropzoneProps) {
           </div>
         </div>
       </div>
-      
+
       {/* Hidden folder input */}
       <input
         id="folder-input"
@@ -201,7 +201,7 @@ export function FileDropzone({ onUploadSuccess }: FileDropzoneProps) {
               {uploading ? 'Uploading...' : `Upload ${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''}`}
             </Button>
           </div>
-          
+
           <div className="space-y-2 max-h-48 overflow-y-auto">
             {selectedFiles.map((file, index) => (
               <div

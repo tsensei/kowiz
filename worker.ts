@@ -35,7 +35,7 @@ async function processConversionJob(jobs: Job<ConversionJobData>[]) {
       // Check if we've exceeded retry limit
       const retryCount = fileRecord.retryCount || 0;
       const maxRetries = 3;
-      
+
       if (retryCount >= maxRetries) {
         const errorMessage = `Maximum retry attempts (${maxRetries}) reached. Last error: ${fileRecord.errorMessage || 'Unknown error'}`;
         console.error(`❌ Retry limit exceeded (${retryCount}/${maxRetries}):`, errorMessage);
@@ -56,7 +56,7 @@ async function processConversionJob(jobs: Job<ConversionJobData>[]) {
       // Check if this is a URL import
       if (fileRecord.sourceUrl && fileRecord.importSource !== 'upload') {
         console.log(`Downloading from ${fileRecord.importSource}: ${fileRecord.sourceUrl}`);
-        
+
         // Update status to downloading
         await databaseService.updateFileStatus(fileId, 'downloading');
 
@@ -95,7 +95,7 @@ async function processConversionJob(jobs: Job<ConversionJobData>[]) {
 
         // Update file record with actual metadata
         await databaseService.updateFileStatus(fileId, 'converting');
-        
+
         // Clean up temp download file
         await urlDownloadService.cleanup(downloadResult.filePath!);
 
@@ -152,7 +152,7 @@ async function processConversionJob(jobs: Job<ConversionJobData>[]) {
       // Upload converted file to MinIO
       const processedFileName = `${fileId}-processed.${fileRecord.targetFormat}`;
       const convertedBuffer = await fs.readFile(outputPath);
-      
+
       console.log('Uploading converted file to MinIO...');
       await minioService.uploadFile(
         BUCKETS.PROCESSED_FILES,
@@ -186,14 +186,14 @@ async function processConversionJob(jobs: Job<ConversionJobData>[]) {
       return { success: true, fileId, converted: true };
     } catch (error) {
       console.error('❌ Error processing job:', error);
-      
+
       const errorMessage = error instanceof Error ? error.message : 'Unknown conversion error';
-      
+
       // Increment retry count
       const updatedFile = await databaseService.incrementRetryCount(fileId);
       const newRetryCount = updatedFile?.retryCount || 0;
       const maxRetries = 3;
-      
+
       // Update status with error
       if (newRetryCount >= maxRetries) {
         // Final failure - exceeded retry limit
@@ -241,7 +241,7 @@ async function startWorker() {
     console.log('   Queue: PostgreSQL (pg-boss)');
     console.log('   Supported conversions:');
     console.log('   - Images: HEIC/HEIF/WebP → JPEG');
-    console.log('   - RAW: CR2/NEF/ARW/DNG → TIFF');
+    console.log('   - RAW: CR2/CR3/NEF/ARW/DNG → TIFF');
     console.log('   - Videos: MP4/MOV/AVI → WebM (VP9+Opus)');
     console.log('   - Audio: MP3/AAC/M4A → Ogg Vorbis');
     console.log('');
