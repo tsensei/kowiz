@@ -4,10 +4,13 @@ import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, Download, FileCheck, Pencil } from 'lucide-react';
+import { Search, Download, FileCheck, Pencil, Music } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 const ImageEditorModal = dynamic(() => import('./image-editor-modal'), {
+  ssr: false,
+});
+const AudioEditorModal = dynamic(() => import('./audio-editor-modal'), {
   ssr: false,
 });
 import { toast } from 'sonner';
@@ -21,6 +24,7 @@ export function CompletedTab({ files }: CompletedTabProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [downloading, setDownloading] = useState<string | null>(null);
   const [editingFile, setEditingFile] = useState<File | null>(null);
+  const [editingAudioFile, setEditingAudioFile] = useState<File | null>(null);
 
   const completedFiles = files.filter(f => f.status === 'completed');
 
@@ -189,6 +193,19 @@ export function CompletedTab({ files }: CompletedTabProps) {
                         Edit Image
                       </Button>
                     )}
+
+                    {/* Edit Button for Audio */}
+                    {file.category === 'audio' && file.processedFilePath && (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => setEditingAudioFile(file)}
+                        className="bg-purple-500 hover:bg-purple-600 text-white"
+                      >
+                        <Music className="h-4 w-4 mr-2" />
+                        Edit Audio
+                      </Button>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -206,6 +223,18 @@ export function CompletedTab({ files }: CompletedTabProps) {
             onClose={() => setEditingFile(null)}
             imageUrl={`/api/files/${editingFile.id}/download?type=${editingFile.processedFilePath ? 'converted' : 'raw'}`}
             fileName={editingFile.name}
+          />
+        )
+      }
+
+      {/* Audio Editor Modal */}
+      {
+        editingAudioFile && (
+          <AudioEditorModal
+            isOpen={!!editingAudioFile}
+            onClose={() => setEditingAudioFile(null)}
+            audioUrl={`/api/files/${editingAudioFile.id}/stream?type=${editingAudioFile.processedFilePath ? 'converted' : 'raw'}`}
+            fileName={editingAudioFile.name}
           />
         )
       }

@@ -7,6 +7,14 @@ const nextConfig: NextConfig = {
       bodySizeLimit: '100mb', // Allow larger file uploads
     },
   },
+  async rewrites() {
+    return [
+      {
+        source: '/audiomass',
+        destination: '/audiomass/index.html',
+      },
+    ];
+  },
 };
 
 export default nextConfig;
