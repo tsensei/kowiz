@@ -1,11 +1,23 @@
 import { pgTable, uuid, varchar, bigint, timestamp, text } from 'drizzle-orm/pg-core';
 
+export const users = pgTable('users', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  wikimediaId: varchar('wikimedia_id', { length: 255 }).notNull().unique(),
+  username: varchar('username', { length: 255 }).notNull(),
+  email: varchar('email', { length: 255 }),
+  name: varchar('name', { length: 255 }),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  lastLoginAt: timestamp('last_login_at').defaultNow().notNull(),
+});
+
 export const files = pgTable('files', {
   id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   name: varchar('name', { length: 255 }).notNull(),
   size: bigint('size', { mode: 'number' }).notNull(), // original size in bytes
   mimeType: varchar('mime_type', { length: 100 }).notNull(),
-  
+
   // Media categorization
   category: varchar('category', { length: 50 }).notNull(), // image, video, audio, raw
   
@@ -36,6 +48,9 @@ export const files = pgTable('files', {
   convertedAt: timestamp('converted_at'),
   uploadedAt: timestamp('uploaded_at'),
 });
+
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
 
 export type File = typeof files.$inferSelect;
 export type NewFile = typeof files.$inferInsert;

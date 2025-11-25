@@ -2,10 +2,23 @@ import { NextRequest, NextResponse } from 'next/server';
 import { databaseService } from '@/lib/services/database.service';
 import { queueService } from '@/lib/services/queue.service';
 import { urlValidationService } from '@/lib/services/url-validation.service';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
 import { v4 as uuidv4 } from 'uuid';
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const userId = session.user.id;
+
     const body = await request.json();
     const { url } = body;
 
@@ -41,6 +54,7 @@ export async function POST(request: NextRequest) {
     // Create database record
     // Note: size and format will be updated after download
     const dbFile = await databaseService.createFile({
+      userId,
       name: placeholderName,
       size: 0, // Will be updated after download
       mimeType: 'video/mp4', // Default, will be updated
