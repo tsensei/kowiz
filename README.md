@@ -4,6 +4,8 @@ Automatic media conversion system for Wikimedia Commons. Upload any media file a
 
 ## ✨ Features
 
+- **🔐 Wikimedia OAuth2** - Secure authentication with Wikimedia accounts
+- **👤 User Isolation** - Each user sees only their own files and conversions
 - **🎯 Smart Format Detection** - Automatically detects and categorizes media files (image/video/audio/RAW)
 - **🔄 Auto Conversion** - Converts unsupported formats to Commons-compatible formats using FFmpeg and ImageMagick
 - **📤 Drag & Drop Upload** - Modern upload interface with multi-file and folder support
@@ -96,7 +98,50 @@ cd kowiz
 pnpm install
 ```
 
-3. **Start Docker services:**
+3. **Configure environment variables:**
+
+Create `.env.local`:
+
+```bash
+# Database
+DATABASE_HOST=localhost
+DATABASE_PORT=5432
+DATABASE_USER=postgres
+DATABASE_PASSWORD=postgres
+DATABASE_NAME=kowiz
+
+# MinIO
+MINIO_ENDPOINT=localhost
+MINIO_PORT=9000
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=minioadmin
+MINIO_USE_SSL=false
+
+# Redis
+REDIS_HOST=localhost
+REDIS_PORT=6379
+
+# NextAuth
+AUTH_SECRET=your-secret-here  # Generate with: openssl rand -base64 32
+NEXTAUTH_URL=http://localhost:3000
+
+# Wikimedia OAuth2
+AUTH_WIKIMEDIA_ID=your-wikimedia-client-id
+AUTH_WIKIMEDIA_SECRET=your-wikimedia-client-secret
+```
+
+4. **Set up Wikimedia OAuth2:**
+
+   a. Visit https://meta.wikimedia.org/wiki/Special:OAuthConsumerRegistration/propose/oauth2
+
+   b. Fill in the form:
+      - **Application name**: KOWiz (or your preferred name)
+      - **OAuth callback URL**: `http://localhost:3000/api/auth/callback/wikimedia`
+      - **Grants**: Select "User identity verification only"
+
+   c. Copy the Client ID and Client Secret to your `.env.local`
+
+5. **Start Docker services:**
 
 ```bash
 docker-compose up -d
@@ -104,29 +149,33 @@ docker-compose up -d
 
 This starts PostgreSQL, MinIO, and the converter container.
 
-4. **Run database migration:**
+6. **Run database migration:**
 
 ```bash
 pnpm drizzle-kit push
 ```
 
-5. **Start the development server:**
+7. **Start the development server:**
 
 ```bash
 pnpm dev
 ```
 
-6. **Start the worker (in a new terminal):**
+8. **Start the worker (in a new terminal):**
 
 ```bash
 pnpm worker
 ```
 
-7. **Open the application:**
+9. **Open the application:**
 
 ```
 http://localhost:3000
 ```
+
+10. **Sign in with Wikimedia:**
+
+Click the "Sign in with Wikimedia" button and authorize the application.
 
 ## 🎬 Usage
 
@@ -149,8 +198,20 @@ http://localhost:3000
 ## 📊 Database Schema
 
 ```sql
+CREATE TABLE users (
+  id              UUID PRIMARY KEY,
+  wikimedia_id    VARCHAR(255) UNIQUE NOT NULL,
+  username        VARCHAR(255) NOT NULL,
+  email           VARCHAR(255),
+  name            VARCHAR(255),
+  created_at      TIMESTAMP DEFAULT NOW() NOT NULL,
+  updated_at      TIMESTAMP DEFAULT NOW() NOT NULL,
+  last_login_at   TIMESTAMP DEFAULT NOW() NOT NULL
+);
+
 CREATE TABLE files (
   id                  UUID PRIMARY KEY,
+  user_id             UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   name                VARCHAR(255) NOT NULL,
   size                BIGINT NOT NULL,
   mime_type           VARCHAR(100) NOT NULL,
@@ -159,6 +220,8 @@ CREATE TABLE files (
   target_format       VARCHAR(50),                 -- jpeg, webm, ogg
   needs_conversion    VARCHAR(10) DEFAULT 'true',
   converted_size      BIGINT,
+  import_source       VARCHAR(50) DEFAULT 'upload', -- upload/youtube/direct_url
+  source_url          TEXT,
   raw_file_path       VARCHAR(500) NOT NULL,
   processed_file_path VARCHAR(500),
   status              VARCHAR(50) DEFAULT 'pending',
@@ -178,17 +241,31 @@ CREATE TABLE files (
 Create `.env.local`:
 
 ```bash
+# Database
 DATABASE_HOST=localhost
 DATABASE_PORT=5432
 DATABASE_USER=postgres
 DATABASE_PASSWORD=postgres
 DATABASE_NAME=kowiz
 
+# MinIO
 MINIO_ENDPOINT=localhost
 MINIO_PORT=9000
 MINIO_ACCESS_KEY=minioadmin
 MINIO_SECRET_KEY=minioadmin
 MINIO_USE_SSL=false
+
+# Redis
+REDIS_HOST=localhost
+REDIS_PORT=6379
+
+# NextAuth
+AUTH_SECRET=your-secret-here
+NEXTAUTH_URL=http://localhost:3000
+
+# Wikimedia OAuth2
+AUTH_WIKIMEDIA_ID=your-wikimedia-client-id
+AUTH_WIKIMEDIA_SECRET=your-wikimedia-client-secret
 ```
 
 ### Worker Concurrency
@@ -332,16 +409,27 @@ curl -X POST http://localhost:3000/api/files/requeue-pending
 kowiz/
 ├── app/
 │   ├── api/
+│   │   ├── auth/
+│   │   │   └── [...nextauth]/route.ts      # NextAuth handler
 │   │   ├── files/
-│   │   │   ├── route.ts                    # GET all files
+│   │   │   ├── route.ts                    # GET user's files
 │   │   │   ├── [id]/download/route.ts      # Download files
+│   │   │   ├── [id]/stream/route.ts        # Stream files
 │   │   │   ├── [id]/retry/route.ts         # Retry conversion
 │   │   │   ├── cleanup-orphaned/route.ts   # Cleanup utility
 │   │   │   └── requeue-pending/route.ts    # Requeue utility
-│   │   └── upload/route.ts                 # Upload endpoint
-│   ├── layout.tsx
+│   │   ├── upload/route.ts                 # Upload endpoint
+│   │   └── import-url/route.ts             # URL import endpoint
+│   ├── auth/
+│   │   ├── signin/page.tsx                 # Sign in page
+│   │   └── error/page.tsx                  # Auth error page
+│   ├── layout.tsx                          # Root layout with SessionProvider
 │   └── page.tsx                            # Main UI with tabs
 ├── components/
+│   ├── auth/
+│   │   └── auth-button.tsx                 # Sign in/out button
+│   ├── providers/
+│   │   └── session-provider.tsx            # NextAuth session provider
 │   ├── ui/                                 # shadcn/ui components
 │   ├── upload-tab.tsx                      # Upload interface
 │   ├── queue-tab.tsx                       # Active monitoring
@@ -349,9 +437,11 @@ kowiz/
 │   ├── file-dropzone.tsx                   # Drag-drop upload
 │   └── file-card.tsx                       # File status card
 ├── lib/
+│   ├── auth.ts                             # NextAuth config
+│   ├── auth-utils.ts                       # Auth helper functions
 │   ├── db/
 │   │   ├── index.ts                        # Database connection
-│   │   ├── schema.ts                       # Drizzle schema
+│   │   ├── schema.ts                       # Drizzle schema (users + files)
 │   │   └── migrations/                     # Migration files
 │   └── services/
 │       ├── database.service.ts             # DB operations
@@ -359,6 +449,8 @@ kowiz/
 │       ├── queue.service.ts                # Job queue
 │       ├── format-detection.service.ts     # Format detection
 │       └── conversion.service.ts           # Media conversion
+├── types/
+│   └── next-auth.d.ts                      # NextAuth type definitions
 ├── worker.ts                               # Background worker
 ├── docker-compose.yml                      # Infrastructure
 ├── drizzle.config.ts                       # ORM config
@@ -495,12 +587,24 @@ pnpm drizzle-kit push
 -crf 35        // Instead of 30 for videos
 ```
 
-## 🔐 Security Notes
+## 🔐 Security & Authentication
+
+### Wikimedia OAuth2
+
+KOWiz uses Wikimedia OAuth2 for secure user authentication:
+
+- **User Accounts**: Users must sign in with their Wikimedia account
+- **User Isolation**: Each user can only see and access their own files
+- **Automatic User Management**: User records are created/updated automatically on sign-in
+- **Session Security**: JWT tokens with NextAuth.js for secure session management
+
+### File Security
 
 - MinIO buckets are private by default
 - Download URLs expire after 1 hour
 - Files accessible only via presigned URLs
 - No direct MinIO access from frontend
+- All API routes verify user authentication and file ownership
 
 ## 🛠️ Tech Stack
 
@@ -515,6 +619,7 @@ pnpm drizzle-kit push
 
 **Backend:**
 - Next.js API Routes
+- NextAuth.js (Wikimedia OAuth2)
 - Drizzle ORM
 - PostgreSQL 16
 - MinIO (S3-compatible storage)
@@ -530,9 +635,20 @@ pnpm drizzle-kit push
 
 ## 📝 API Endpoints
 
+All endpoints require authentication via NextAuth.js session.
+
+### Authentication
+```typescript
+GET  /api/auth/signin              # Sign in page
+POST /api/auth/signout             # Sign out
+GET  /api/auth/session             # Get current session
+GET  /api/auth/callback/wikimedia  # OAuth callback
+```
+
 ### Upload Files
 ```typescript
 POST /api/upload
+Headers: Cookie with session
 Body: FormData with 'files' field (multiple files)
 Response: { success, results, totalFiles, successfulUploads, failedUploads }
 ```
@@ -540,25 +656,36 @@ Response: { success, results, totalFiles, successfulUploads, failedUploads }
 ### Import from URL
 ```typescript
 POST /api/import-url
+Headers: Cookie with session
 Body: { url: string }
 Response: { success, file: { id, name, importSource, sourceUrl, status, type, platform } }
 ```
 
-### Get All Files
+### Get User's Files
 ```typescript
 GET /api/files
-Response: { files: File[] }
+Headers: Cookie with session
+Response: { files: File[] }  # Only returns current user's files
 ```
 
 ### Download File
 ```typescript
 GET /api/files/[id]/download?type=raw|converted
-Response: { downloadUrl, fileName, expiresIn }
+Headers: Cookie with session
+Response: File stream (verifies user ownership)
+```
+
+### Stream File
+```typescript
+GET /api/files/[id]/stream?type=raw|converted
+Headers: Cookie with session
+Response: File stream for inline viewing (verifies user ownership)
 ```
 
 ### Retry Conversion
 ```typescript
 POST /api/files/[id]/retry
+Headers: Cookie with session
 Response: { success, message }
 ```
 

@@ -3,10 +3,23 @@ import { databaseService } from '@/lib/services/database.service';
 import { minioService, BUCKETS } from '@/lib/services/minio.service';
 import { queueService } from '@/lib/services/queue.service';
 import { formatDetectionService } from '@/lib/services/format-detection.service';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
 import { v4 as uuidv4 } from 'uuid';
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const userId = session.user.id;
+
     const formData = await request.formData();
     const uploadedFiles = formData.getAll('files') as File[];
 
@@ -37,6 +50,7 @@ export async function POST(request: NextRequest) {
         // Step 4: Create database record with full metadata
         try {
           dbFile = await databaseService.createFile({
+            userId,
             name: file.name,
             size: file.size,
             mimeType: file.type || 'application/octet-stream',

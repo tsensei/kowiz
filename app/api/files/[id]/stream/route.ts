@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { databaseService } from '@/lib/services/database.service';
 import { minioService, BUCKETS } from '@/lib/services/minio.service';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
 
 /**
  * Stream endpoint for serving audio/video files inline (not as download)
@@ -11,12 +13,21 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
     const { id } = await params;
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type') || 'converted'; // 'raw' or 'converted'
 
-    // Get file from database
-    const file = await databaseService.getFileById(id);
+    // Get file from database and verify ownership
+    const file = await databaseService.getFileById(id, session.user.id);
 
     if (!file) {
       return NextResponse.json({ error: 'File not found' }, { status: 404 });

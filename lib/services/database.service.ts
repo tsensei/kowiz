@@ -1,6 +1,6 @@
 import { db } from '../db';
 import { files, type File, type NewFile } from '../db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and } from 'drizzle-orm';
 
 export class DatabaseService {
   async createFile(fileData: NewFile): Promise<File> {
@@ -8,13 +8,25 @@ export class DatabaseService {
     return file;
   }
 
-  async getFileById(id: string): Promise<File | undefined> {
-    const [file] = await db.select().from(files).where(eq(files.id, id));
+  async getFileById(id: string, userId?: string): Promise<File | undefined> {
+    const conditions = userId
+      ? and(eq(files.id, id), eq(files.userId, userId))
+      : eq(files.id, id);
+
+    const [file] = await db.select().from(files).where(conditions);
     return file;
   }
 
-  async getAllFiles(): Promise<File[]> {
-    return await db.select().from(files).orderBy(desc(files.createdAt));
+  async getAllFiles(userId?: string): Promise<File[]> {
+    const query = userId
+      ? db.select().from(files).where(eq(files.userId, userId)).orderBy(desc(files.createdAt))
+      : db.select().from(files).orderBy(desc(files.createdAt));
+
+    return await query;
+  }
+
+  async getFilesByUser(userId: string): Promise<File[]> {
+    return await db.select().from(files).where(eq(files.userId, userId)).orderBy(desc(files.createdAt));
   }
 
   async updateFileStatus(id: string, status: string, errorMessage?: string): Promise<File | undefined> {
