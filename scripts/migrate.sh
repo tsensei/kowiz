@@ -27,8 +27,8 @@ echo ""
 # Run migrations
 echo "Applying migrations..."
 
-# Auto-confirm destructive changes in production
-yes | pnpm drizzle-kit push || true
+# Auto-accept all data-loss statements using --force flag
+pnpm drizzle-kit push --force
 
 echo ""
 echo "✓ Migrations completed successfully!"
