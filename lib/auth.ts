@@ -9,6 +9,12 @@ export const authOptions: NextAuthOptions = {
     WikimediaProvider({
       clientId: process.env.AUTH_WIKIMEDIA_ID!,
       clientSecret: process.env.AUTH_WIKIMEDIA_SECRET!,
+      // Wikimedia requires a User-Agent header
+      httpOptions: {
+        headers: {
+          "User-Agent": "KOWiz/1.0 (https://app.kowiz.tsensei.dev; contact@example.com)",
+        },
+      },
       // Optional: You can add profile callback to customize the user data
       profile(profile) {
         return {
