@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import { UploadTab } from '@/components/upload-tab';
 import { QueueTab } from '@/components/queue-tab';
 import { CompletedTab } from '@/components/completed-tab';
@@ -10,8 +12,11 @@ import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
 import { Sparkles, RefreshCw, Upload, Clock, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { AuthButton } from '@/components/auth/auth-button';
 
 export default function Home() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const [files, setFiles] = useState<File[]>([]);
   const [loading, setLoading] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(() => {
@@ -24,9 +29,23 @@ export default function Home() {
   });
   const [wasProcessing, setWasProcessing] = useState(false);
 
+  // Redirect to sign-in if not authenticated
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/auth/signin');
+    }
+  }, [status, router]);
+
   const fetchFiles = async () => {
     try {
       const response = await fetch('/api/files');
+
+      // Handle unauthorized
+      if (response.status === 401) {
+        router.push('/auth/signin');
+        return;
+      }
+
       const data = await response.json();
       setFiles(data.files);
       
@@ -75,15 +94,18 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    // Only fetch files if authenticated
+    if (status !== 'authenticated') return;
+
     fetchFiles();
-    
+
     if (!autoRefresh) return;
-    
+
     // Poll for updates every 2 seconds
     const interval = setInterval(fetchFiles, 2000);
-    
+
     return () => clearInterval(interval);
-  }, [autoRefresh]);
+  }, [autoRefresh, status]);
 
   const stats = {
     total: files.length,
@@ -92,10 +114,27 @@ export default function Home() {
     failed: files.filter(f => f.status === 'failed').length,
   };
 
+  // Show loading state while checking authentication
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
+        <div className="text-center">
+          <div className="animate-spin h-12 w-12 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render the main content if not authenticated (will redirect)
+  if (!session) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       <Toaster />
-      
+
       {/* Header */}
       <div className="border-b bg-white dark:bg-slate-900 sticky top-0 z-50 shadow-sm">
         <div className="container mx-auto py-4 px-6">
@@ -114,6 +153,7 @@ export default function Home() {
         </div>
             </div>
             <div className="flex items-center gap-3">
+              <AuthButton />
               {stats.processing > 0 && (
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 rounded-full">
                   <div className="h-2 w-2 bg-blue-600 rounded-full animate-pulse" />
