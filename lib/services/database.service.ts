@@ -1,6 +1,6 @@
 import { db } from '../db';
 import { files, type File, type NewFile } from '../db/schema';
-import { eq, desc, and } from 'drizzle-orm';
+import { eq, desc, and, sql } from 'drizzle-orm';
 
 export class DatabaseService {
   async createFile(fileData: NewFile): Promise<File> {
@@ -29,22 +29,55 @@ export class DatabaseService {
     return await db.select().from(files).where(eq(files.userId, userId)).orderBy(desc(files.createdAt));
   }
 
+  async getFilesByUserPaginated(
+    userId: string,
+    page: number = 1,
+    limit: number = 10,
+    status?: string
+  ): Promise<{ files: File[]; total: number }> {
+    const offset = (page - 1) * limit;
+
+    let conditions = eq(files.userId, userId);
+    if (status) {
+      conditions = and(conditions, eq(files.status, status))!;
+    }
+
+    const [countResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(files)
+      .where(conditions);
+
+    const total = Number(countResult.count);
+
+    const result = await db
+      .select()
+      .from(files)
+      .where(conditions)
+      .limit(limit)
+      .offset(offset)
+      .orderBy(desc(files.createdAt));
+
+    return { files: result, total };
+  }
+
+
+
   async updateFileStatus(id: string, status: string, errorMessage?: string): Promise<File | undefined> {
     const updateData: any = { status, updatedAt: new Date() };
-    
+
     if (errorMessage !== undefined) {
       updateData.errorMessage = errorMessage;
     }
-    
+
     if (status === 'converting') {
       // Clear error message when retrying
       updateData.errorMessage = null;
     }
-    
+
     if (status === 'completed') {
       updateData.uploadedAt = new Date();
     }
-    
+
     const [file] = await db
       .update(files)
       .set(updateData)
@@ -74,7 +107,7 @@ export class DatabaseService {
   async incrementRetryCount(id: string): Promise<File | undefined> {
     const file = await this.getFileById(id);
     if (!file) return undefined;
-    
+
     const [updatedFile] = await db
       .update(files)
       .set({

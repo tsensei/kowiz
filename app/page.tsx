@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { UploadTab } from '@/components/upload-tab';
 import { QueueTab } from '@/components/queue-tab';
 import { CompletedTab } from '@/components/completed-tab';
@@ -17,6 +17,8 @@ import { AuthButton } from '@/components/auth/auth-button';
 export default function Home() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const currentTab = searchParams.get('tab') || 'upload';
   const [files, setFiles] = useState<File[]>([]);
   const [loading, setLoading] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(() => {
@@ -27,7 +29,6 @@ export default function Home() {
     }
     return true;
   });
-  const [wasProcessing, setWasProcessing] = useState(false);
 
   // Redirect to sign-in if not authenticated
   useEffect(() => {
@@ -38,7 +39,7 @@ export default function Home() {
 
   const fetchFiles = async () => {
     try {
-      const response = await fetch('/api/files');
+      const response = await fetch('/api/files?all=true');
 
       // Handle unauthorized
       if (response.status === 401) {
@@ -48,26 +49,6 @@ export default function Home() {
 
       const data = await response.json();
       setFiles(data.files);
-      
-      // Check if there are any processing files
-      const hasProcessing = data.files.some((f: File) => 
-        f.status === 'queued' || f.status === 'converting'
-      );
-      
-      // Show notification if we just came back and files were processing
-      if (typeof window !== 'undefined' && wasProcessing && !hasProcessing) {
-        const completedCount = data.files.filter((f: File) => 
-          f.status === 'completed'
-        ).length;
-        if (completedCount > 0) {
-          toast.success(`${completedCount} file(s) finished processing while you were away!`);
-        }
-        setWasProcessing(false);
-        localStorage.removeItem('kowiz-was-processing');
-      } else if (hasProcessing) {
-        setWasProcessing(true);
-        localStorage.setItem('kowiz-was-processing', 'true');
-      }
     } catch (error) {
       console.error('Error fetching files:', error);
     } finally {
@@ -82,16 +63,7 @@ export default function Home() {
     }
   }, [autoRefresh]);
 
-  // Check if we were processing before page reload
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const wasProc = localStorage.getItem('kowiz-was-processing');
-      if (wasProc) {
-        setWasProcessing(true);
-        toast.info('Resuming... Checking file statuses');
-      }
-    }
-  }, []);
+
 
   useEffect(() => {
     // Only fetch files if authenticated
@@ -146,11 +118,11 @@ export default function Home() {
               <div>
                 <h1 className="text-xl font-bold">
                   KOWiz
-          </h1>
+                </h1>
                 <p className="text-xs text-muted-foreground">
                   Wikimedia Commons Converter
-          </p>
-        </div>
+                </p>
+              </div>
             </div>
             <div className="flex items-center gap-3">
               <AuthButton />
@@ -177,7 +149,11 @@ export default function Home() {
 
       {/* Main Content */}
       <main className="container mx-auto py-8 px-6 max-w-6xl">
-        <Tabs defaultValue="upload" className="space-y-6">
+        <Tabs
+          value={currentTab}
+          onValueChange={(value) => router.push(`/?tab=${value}`)}
+          className="space-y-6"
+        >
           <TabsList className="grid w-full grid-cols-3 h-11">
             <TabsTrigger value="upload">
               <Upload className="h-4 w-4 mr-2" />
