@@ -6,6 +6,20 @@ import { Upload, FileImage, FileVideo, FileAudio, File as FileIcon } from 'lucid
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { Progress } from '@/components/ui/progress';
+
+interface UploadResult {
+  success: boolean;
+  fileName: string;
+  error?: string;
+}
+
+interface UploadResponse {
+  successfulUploads: number;
+  totalFiles: number;
+  failedUploads: number;
+  results: UploadResult[];
+}
 
 interface FileDropzoneProps {
   onUploadSuccess: () => void;
@@ -14,6 +28,9 @@ interface FileDropzoneProps {
 export function FileDropzone({ onUploadSuccess }: FileDropzoneProps) {
   const [uploading, setUploading] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadedBytes, setUploadedBytes] = useState(0);
+  const [totalBytes, setTotalBytes] = useState(0);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     setSelectedFiles((prev) => [...prev, ...acceptedFiles]);
@@ -22,8 +39,7 @@ export function FileDropzone({ onUploadSuccess }: FileDropzoneProps) {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     multiple: true,
-    // @ts-ignore - webkitdirectory is not in the types but works
-    useFsAccessApi: false, // Use traditional file input for folder support
+    // useFsAccessApi: false, // Use traditional file input for folder support
     accept: {
       'image/*': ['.jpg', '.jpeg', '.png', '.gif', '.heic', '.heif', '.webp', '.bmp', '.tiff', '.tif', '.cr2', '.cr3', '.nef', '.arw', '.dng', '.rw2', '.orf', '.raf'],
       'video/*': ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.ogv', '.m4v', '.flv', '.wmv'],
@@ -44,6 +60,14 @@ export function FileDropzone({ onUploadSuccess }: FileDropzoneProps) {
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const formatBytes = (bytes: number) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
   const handleUpload = async () => {
     if (selectedFiles.length === 0) {
       toast.error('Please select at least one file');
@@ -51,6 +75,9 @@ export function FileDropzone({ onUploadSuccess }: FileDropzoneProps) {
     }
 
     setUploading(true);
+    setUploadProgress(0);
+    setUploadedBytes(0);
+    setTotalBytes(0);
 
     try {
       const formData = new FormData();
@@ -58,46 +85,69 @@ export function FileDropzone({ onUploadSuccess }: FileDropzoneProps) {
         formData.append('files', file);
       });
 
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
+      const response = await new Promise<UploadResponse>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/upload');
+
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            setUploadProgress((event.loaded / event.total) * 100);
+            setUploadedBytes(event.loaded);
+            setTotalBytes(event.total);
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const data = JSON.parse(xhr.responseText);
+              resolve(data);
+            } catch (e) {
+              reject(new Error('Invalid JSON response'));
+            }
+          } else {
+            try {
+              const data = JSON.parse(xhr.responseText);
+              reject(new Error(data.error || 'Upload failed'));
+            } catch (e) {
+              reject(new Error('Upload failed'));
+            }
+          }
+        };
+
+        xhr.onerror = () => reject(new Error('Network error'));
+        xhr.send(formData);
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Upload failed');
-      }
-
       // Show detailed feedback
-      if (data.failedUploads > 0) {
+      if (response.failedUploads > 0) {
         // Some files failed
-        const failedFiles = data.results
-          .filter((r: any) => !r.success)
-          .map((r: any) => r.fileName)
+        const failedFiles = response.results
+          .filter((r) => !r.success)
+          .map((r) => r.fileName)
           .join(', ');
 
         toast.warning(
-          `${data.successfulUploads} of ${data.totalFiles} files uploaded. Failed: ${failedFiles}`,
+          `${response.successfulUploads} of ${response.totalFiles} files uploaded. Failed: ${failedFiles}`,
           { duration: 5000 }
         );
 
         // Show individual error details
-        data.results.forEach((result: any) => {
+        response.results.forEach((result) => {
           if (!result.success) {
             toast.error(`${result.fileName}: ${result.error}`, { duration: 4000 });
           }
         });
       } else {
         // All succeeded
-        toast.success(`Successfully uploaded ${data.successfulUploads} file(s)!`);
+        toast.success(`Successfully uploaded ${response.successfulUploads} file(s)!`);
       }
 
       // Clear successfully uploaded files
-      if (data.successfulUploads > 0) {
-        const failedFileNames = data.results
-          .filter((r: any) => !r.success)
-          .map((r: any) => r.fileName);
+      if (response.successfulUploads > 0) {
+        const failedFileNames = response.results
+          .filter((r) => !r.success)
+          .map((r) => r.fileName);
 
         setSelectedFiles((prev) =>
           prev.filter((file) => failedFileNames.includes(file.name))
@@ -116,6 +166,7 @@ export function FileDropzone({ onUploadSuccess }: FileDropzoneProps) {
       toast.error(error instanceof Error ? error.message : 'Failed to upload files');
     } finally {
       setUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -178,7 +229,7 @@ export function FileDropzone({ onUploadSuccess }: FileDropzoneProps) {
       <input
         id="folder-input"
         type="file"
-        // @ts-ignore - webkitdirectory is not in types but is standard
+        // @ts-expect-error - webkitdirectory is not in types but is standard
         webkitdirectory=""
         directory=""
         multiple
@@ -201,6 +252,16 @@ export function FileDropzone({ onUploadSuccess }: FileDropzoneProps) {
               {uploading ? 'Uploading...' : `Upload ${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''}`}
             </Button>
           </div>
+
+          {uploading && (
+            <div className="space-y-1">
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Uploading...</span>
+                <span>{formatBytes(uploadedBytes)} / {formatBytes(totalBytes)}</span>
+              </div>
+              <Progress value={uploadProgress} className="h-2" />
+            </div>
+          )}
 
           <div className="space-y-2 max-h-48 overflow-y-auto">
             {selectedFiles.map((file, index) => (
