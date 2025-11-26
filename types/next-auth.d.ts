@@ -6,6 +6,7 @@ declare module "next-auth" {
       id: string;
       username?: string;
       wikimediaId?: string;
+      isAdmin?: boolean;
     } & DefaultSession["user"];
     accessToken?: string;
   }
@@ -23,5 +24,6 @@ declare module "next-auth/jwt" {
     wikimediaId?: string;
     username?: string;
     accessToken?: string;
+    isAdmin?: boolean;
   }
 }

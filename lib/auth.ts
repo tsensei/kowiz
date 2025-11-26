@@ -110,6 +110,7 @@ export const authOptions: NextAuthOptions = {
             .where(eq(users.wikimediaId, wikimediaId))
             .returning();
           token.userId = updatedUser.id;
+          token.isAdmin = updatedUser.isAdmin;
         } else {
           // Create new user
           const [newUser] = await db
@@ -122,6 +123,7 @@ export const authOptions: NextAuthOptions = {
             })
             .returning();
           token.userId = newUser.id;
+          token.isAdmin = newUser.isAdmin;
         }
       }
       return token;
@@ -135,6 +137,7 @@ export const authOptions: NextAuthOptions = {
           id: token.userId as string,
           username: token.username as string,
           wikimediaId: token.wikimediaId as string,
+          isAdmin: token.isAdmin as boolean,
         };
       }
       // Add access token to session
