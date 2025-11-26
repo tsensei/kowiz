@@ -3,6 +3,7 @@ import { databaseService } from '@/lib/services/database.service';
 import { minioService, BUCKETS } from '@/lib/services/minio.service';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
+import { logAudit } from '@/lib/audit';
 
 export async function GET(
   request: NextRequest,
@@ -82,6 +83,22 @@ export async function GET(
           controller.error(error);
         }
       },
+    });
+
+    // Log download audit event
+    await logAudit({
+      userId: session.user.id,
+      username: session.user.username,
+      action: 'file.download',
+      resourceType: 'file',
+      resourceId: id,
+      metadata: {
+        fileName,
+        fileType: type,
+        originalFormat: file.originalFormat,
+        targetFormat: file.targetFormat,
+      },
+      success: true,
     });
 
     // Return file as stream with proper headers

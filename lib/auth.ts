@@ -3,6 +3,7 @@ import WikimediaProvider from "next-auth/providers/wikimedia";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { logAudit } from "@/lib/audit";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -111,6 +112,19 @@ export const authOptions: NextAuthOptions = {
             .returning();
           token.userId = updatedUser.id;
           token.isAdmin = updatedUser.isAdmin;
+
+          // Log user login
+          await logAudit({
+            userId: updatedUser.id,
+            username: updatedUser.username,
+            action: 'user.login',
+            resourceType: 'user',
+            resourceId: updatedUser.id,
+            metadata: {
+              wikimediaId: updatedUser.wikimediaId,
+              isAdmin: updatedUser.isAdmin,
+            },
+          });
         } else {
           // Create new user
           const [newUser] = await db
@@ -124,6 +138,18 @@ export const authOptions: NextAuthOptions = {
             .returning();
           token.userId = newUser.id;
           token.isAdmin = newUser.isAdmin;
+
+          // Log user registration
+          await logAudit({
+            userId: newUser.id,
+            username: newUser.username,
+            action: 'user.register',
+            resourceType: 'user',
+            resourceId: newUser.id,
+            metadata: {
+              wikimediaId: newUser.wikimediaId,
+            },
+          });
         }
       }
       return token;

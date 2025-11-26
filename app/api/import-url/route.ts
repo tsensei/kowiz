@@ -5,6 +5,7 @@ import { urlValidationService } from '@/lib/services/url-validation.service';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { v4 as uuidv4 } from 'uuid';
+import { logAudit } from '@/lib/audit';
 
 export async function POST(request: NextRequest) {
   try {
@@ -79,6 +80,23 @@ export async function POST(request: NextRequest) {
     await databaseService.updateFileStatus(dbFile.id, 'queued');
 
     console.log(`✓ URL import queued: ${placeholderName}`);
+
+    // Log import audit event
+    await logAudit({
+      userId,
+      username: session.user.username,
+      action: importSource === 'youtube' ? 'file.import.youtube' : 'file.import.url',
+      resourceType: 'file',
+      resourceId: dbFile.id,
+      metadata: {
+        sourceUrl: sanitizedUrl,
+        importSource,
+        validationType: validation.type,
+        platform: validation.metadata?.platform,
+        videoId: validation.metadata?.videoId,
+      },
+      success: true,
+    });
 
     return NextResponse.json({
       success: true,

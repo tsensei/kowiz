@@ -3,6 +3,7 @@ import { databaseService } from '@/lib/services/database.service';
 import { queueService } from '@/lib/services/queue.service';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
+import { logAudit } from '@/lib/audit';
 
 export async function POST(
   request: NextRequest,
@@ -42,6 +43,21 @@ export async function POST(
       fileId: file.id,
       fileName: file.name,
       mimeType: file.mimeType,
+    });
+
+    // Log retry audit event
+    await logAudit({
+      userId: session.user.id,
+      username: session.user.username,
+      action: 'file.retry',
+      resourceType: 'file',
+      resourceId: id,
+      metadata: {
+        fileName: file.name,
+        retryCount: file.retryCount || 0,
+        previousStatus: file.status,
+      },
+      success: true,
     });
 
     return NextResponse.json({

@@ -2,12 +2,13 @@ import { redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { users, files } from '@/lib/db/schema';
-import { sql, count, sum } from 'drizzle-orm';
+import { users, files, auditLogs } from '@/lib/db/schema';
+import { sql, count, sum, eq, desc } from 'drizzle-orm';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Shield, Users, FileIcon, HardDrive, TrendingUp } from 'lucide-react';
 import { AuthButton } from '@/components/auth/auth-button';
 import { AdminTabs } from '@/components/admin-tabs';
+import { logAudit } from '@/lib/audit';
 
 function formatBytes(bytes: number) {
   if (bytes === 0) return '0 Bytes';
@@ -54,24 +55,40 @@ async function getAdminStats() {
     .from(files)
     .groupBy(files.category);
 
-  // Get recent users (last 10)
-  const recentUsers = await db
+  // Get per-user analytics with file counts and storage usage
+  const userAnalytics = await db
     .select({
-      id: users.id,
+      userId: users.id,
       username: users.username,
       email: users.email,
+      isAdmin: users.isAdmin,
       createdAt: users.createdAt,
       lastLoginAt: users.lastLoginAt,
-      isAdmin: users.isAdmin
+      fileCount: sql<number>`CAST(COUNT(${files.id}) AS INTEGER)`,
+      totalStorage: sql<string>`COALESCE(SUM(${files.size}), 0)`,
+      convertedStorage: sql<string>`COALESCE(SUM(${files.convertedSize}), 0)`,
     })
     .from(users)
-    .orderBy(sql`${users.createdAt} DESC`)
-    .limit(10);
+    .leftJoin(files, eq(users.id, files.userId))
+    .groupBy(users.id, users.username, users.email, users.isAdmin, users.createdAt, users.lastLoginAt)
+    .orderBy(desc(users.createdAt))
+    .limit(20);
+
+  // Get recent audit logs (last 50)
+  const recentAuditLogs = await db
+    .select()
+    .from(auditLogs)
+    .orderBy(desc(auditLogs.createdAt))
+    .limit(50);
 
   return {
     users: {
       total: usersCount.count,
-      recent: recentUsers
+      analytics: userAnalytics.map(u => ({
+        ...u,
+        totalStorage: Number(u.totalStorage),
+        convertedStorage: Number(u.convertedStorage),
+      })),
     },
     files: {
       total: filesCount.count,
@@ -81,7 +98,8 @@ async function getAdminStats() {
     storage: {
       totalSize: Number(storageStats.totalSize) || 0,
       convertedSize: Number(storageStats.convertedSize) || 0,
-    }
+    },
+    auditLogs: recentAuditLogs,
   };
 }
 
@@ -100,6 +118,14 @@ export default async function AdminPage() {
 
   // Fetch stats on the server
   const stats = await getAdminStats();
+
+  // Log admin access
+  await logAudit({
+    userId: session.user.id,
+    username: session.user.username,
+    action: 'admin.access',
+    resourceType: 'system',
+  });
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">

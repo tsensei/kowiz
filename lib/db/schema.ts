@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, bigint, timestamp, text, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, bigint, timestamp, text, boolean, jsonb } from 'drizzle-orm/pg-core';
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -50,9 +50,25 @@ export const files = pgTable('files', {
   uploadedAt: timestamp('uploaded_at'),
 });
 
+export const auditLogs = pgTable('audit_logs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }), // nullable for system actions
+  username: varchar('username', { length: 255 }), // denormalized for historical tracking
+  action: varchar('action', { length: 100 }).notNull(), // upload, download, convert, delete, import, retry, etc.
+  resourceType: varchar('resource_type', { length: 50 }).notNull(), // file, user, system
+  resourceId: uuid('resource_id'), // ID of the affected resource
+  metadata: jsonb('metadata'), // flexible JSON field for action-specific data
+  success: boolean('success').notNull().default(true),
+  errorMessage: text('error_message'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 
 export type File = typeof files.$inferSelect;
 export type NewFile = typeof files.$inferInsert;
+
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type NewAuditLog = typeof auditLogs.$inferInsert;
 

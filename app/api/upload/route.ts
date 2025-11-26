@@ -6,6 +6,7 @@ import { formatDetectionService } from '@/lib/services/format-detection.service'
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { v4 as uuidv4 } from 'uuid';
+import { logAudit } from '@/lib/audit';
 
 export async function POST(request: NextRequest) {
   try {
@@ -139,16 +140,51 @@ export async function POST(request: NextRequest) {
 
         console.log(`✓ Successfully uploaded and queued: ${file.name}`);
 
+        // Log audit event
+        await logAudit({
+          userId,
+          username: session.user.username,
+          action: 'file.upload',
+          resourceType: 'file',
+          resourceId: dbFile.id,
+          metadata: {
+            fileName: file.name,
+            fileSize: file.size,
+            mimeType: file.type,
+            category: formatInfo.category,
+            originalFormat: formatInfo.originalFormat,
+            targetFormat: formatInfo.targetFormat,
+            needsConversion: formatInfo.needsConversion,
+          },
+          success: true,
+        });
+
       } catch (error) {
         console.error(`✗ Failed to process file ${file.name}:`, error);
-        
+
         const errorMessage = error instanceof Error ? error.message : 'Upload failed';
-        
+
         results.push({
           success: false,
           fileName: file.name,
           error: errorMessage,
           rollbackCompleted: true,
+        });
+
+        // Log failed upload audit event
+        await logAudit({
+          userId,
+          username: session.user.username,
+          action: 'file.upload',
+          resourceType: 'file',
+          resourceId: dbFile?.id,
+          metadata: {
+            fileName: file.name,
+            fileSize: file.size,
+            mimeType: file.type,
+          },
+          success: false,
+          errorMessage,
         });
       }
     }
