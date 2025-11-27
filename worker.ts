@@ -146,14 +146,34 @@ async function processConversionJob(jobs: Job<ConversionJobData>[]) {
       await fs.writeFile(inputPath, fileBuffer);
       console.log('✓ File downloaded to temp storage');
 
-      // Perform conversion
+      // Perform conversion with progress tracking
       console.log(`Converting ${fileRecord.originalFormat} → ${fileRecord.targetFormat}...`);
+
+      // Throttle progress updates: every 5 seconds or 10% change
+      const PROGRESS_UPDATE_INTERVAL = 5000; // 5 seconds
+      const MIN_PROGRESS_DELTA = 10; // 10%
+      let lastProgressUpdate = 0;
+      let lastProgressValue = 0;
+
       const conversionResult = await conversionService.convert({
         inputPath,
         outputPath,
         sourceFormat: fileRecord.originalFormat,
         targetFormat: fileRecord.targetFormat!,
         category: fileRecord.category as any,
+        onProgress: async (progress: number) => {
+          const now = Date.now();
+          const timeSinceLastUpdate = now - lastProgressUpdate;
+          const progressDelta = Math.abs(progress - lastProgressValue);
+
+          // Update if enough time has passed OR progress changed significantly
+          if (timeSinceLastUpdate >= PROGRESS_UPDATE_INTERVAL || progressDelta >= MIN_PROGRESS_DELTA) {
+            await databaseService.updateConversionProgress(fileId, progress);
+            console.log(`  Progress: ${progress}%`);
+            lastProgressUpdate = now;
+            lastProgressValue = progress;
+          }
+        },
       });
 
       if (!conversionResult.success) {

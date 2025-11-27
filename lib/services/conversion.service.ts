@@ -1,4 +1,4 @@
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -12,6 +12,7 @@ export interface ConversionOptions {
   sourceFormat: string;
   targetFormat: string;
   category: 'image' | 'video' | 'audio' | 'raw';
+  onProgress?: (progress: number) => void; // Progress callback (0-100)
 }
 
 export interface ConversionResult {
@@ -65,6 +66,67 @@ export class ConversionService {
         error: error instanceof Error ? error.message : 'Unknown conversion error',
       };
     }
+  }
+
+  /**
+   * Execute FFmpeg with progress tracking using spawn()
+   */
+  private async execFFmpegWithProgress(
+    args: string[],
+    onProgress?: (progress: number) => void
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const ffmpeg = spawn('ffmpeg', args);
+
+      let duration: number | null = null;
+      let stderr = '';
+
+      ffmpeg.stderr.on('data', (data: Buffer) => {
+        const text = data.toString();
+        stderr += text;
+
+        // Extract duration from initial output (format: Duration: HH:MM:SS.ms)
+        if (!duration) {
+          const durationMatch = text.match(/Duration: (\d{2}):(\d{2}):(\d{2}\.\d{2})/);
+          if (durationMatch) {
+            const hours = parseInt(durationMatch[1]);
+            const minutes = parseInt(durationMatch[2]);
+            const seconds = parseFloat(durationMatch[3]);
+            duration = hours * 3600 + minutes * 60 + seconds;
+            console.log(`  Total duration: ${duration.toFixed(2)}s`);
+          }
+        }
+
+        // Extract current time from progress output (format: time=HH:MM:SS.ms)
+        if (duration && onProgress) {
+          const timeMatch = text.match(/time=(\d{2}):(\d{2}):(\d{2}\.\d{2})/);
+          if (timeMatch) {
+            const hours = parseInt(timeMatch[1]);
+            const minutes = parseInt(timeMatch[2]);
+            const seconds = parseFloat(timeMatch[3]);
+            const currentTime = hours * 3600 + minutes * 60 + seconds;
+
+            // Calculate percentage (0-100)
+            const progress = Math.min(100, Math.round((currentTime / duration) * 100));
+            onProgress(progress);
+          }
+        }
+      });
+
+      ffmpeg.on('close', (code) => {
+        if (code === 0) {
+          // Report 100% on successful completion
+          if (onProgress) onProgress(100);
+          resolve();
+        } else {
+          reject(new Error(`FFmpeg exited with code ${code}: ${stderr}`));
+        }
+      });
+
+      ffmpeg.on('error', (error) => {
+        reject(new Error(`FFmpeg spawn error: ${error.message}`));
+      });
+    });
   }
 
   /**
@@ -169,34 +231,33 @@ export class ConversionService {
    * Convert video to WebM format using FFmpeg
    */
   private async convertVideo(options: ConversionOptions): Promise<ConversionResult> {
-    const { inputPath, outputPath } = options;
+    const { inputPath, outputPath, onProgress } = options;
 
     try {
       // Convert to WebM with VP9 video codec and Opus audio codec
       // High-quality settings preserving original resolution
-      // CRF 18: Near-lossless quality (lower = better, 15-23 recommended for high quality)
-      // 2-pass encoding for better quality/size ratio
-      // No resolution downscaling - preserves original dimensions
-      const command = `ffmpeg -i "${inputPath}" \
-        -c:v libvpx-vp9 \
-        -crf 18 \
-        -b:v 0 \
-        -c:a libopus \
-        -b:a 192k \
-        -row-mt 1 \
-        -threads 8 \
-        -deadline good \
-        -cpu-used 1 \
-        -tile-columns 2 \
-        -tile-rows 1 \
-        -frame-parallel 0 \
-        -auto-alt-ref 1 \
-        -lag-in-frames 25 \
-        -g 240 \
-        -pix_fmt yuv420p10le \
-        -y "${outputPath}"`;
+      const args = [
+        '-i', inputPath,
+        '-c:v', 'libvpx-vp9',
+        '-crf', '18',
+        '-b:v', '0',
+        '-c:a', 'libopus',
+        '-b:a', '192k',
+        '-row-mt', '1',
+        '-threads', '8',
+        '-deadline', 'good',
+        '-cpu-used', '1',
+        '-tile-columns', '2',
+        '-tile-rows', '1',
+        '-frame-parallel', '0',
+        '-auto-alt-ref', '1',
+        '-lag-in-frames', '25',
+        '-g', '240',
+        '-pix_fmt', 'yuv420p10le',
+        '-y', outputPath
+      ];
 
-      await execAsync(command, { maxBuffer: 200 * 1024 * 1024 }); // 200MB buffer for high quality
+      await this.execFFmpegWithProgress(args, onProgress);
 
       const stats = await fs.stat(outputPath);
 
@@ -214,19 +275,19 @@ export class ConversionService {
    * Convert audio to Ogg Vorbis format using FFmpeg
    */
   private async convertAudio(options: ConversionOptions): Promise<ConversionResult> {
-    const { inputPath, outputPath } = options;
+    const { inputPath, outputPath, onProgress } = options;
 
     try {
       // Convert to Ogg Vorbis with maximum quality
-      // Quality level 10: Maximum quality (scale 0-10, higher is better)
-      // Preserves sample rate and channels from source
-      const command = `ffmpeg -i "${inputPath}" \
-        -c:a libvorbis \
-        -q:a 10 \
-        -ar 48000 \
-        -y "${outputPath}"`;
+      const args = [
+        '-i', inputPath,
+        '-c:a', 'libvorbis',
+        '-q:a', '10',
+        '-ar', '48000',
+        '-y', outputPath
+      ];
 
-      await execAsync(command, { maxBuffer: 100 * 1024 * 1024 }); // 100MB buffer
+      await this.execFFmpegWithProgress(args, onProgress);
 
       const stats = await fs.stat(outputPath);
 

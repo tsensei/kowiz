@@ -123,11 +123,18 @@ export function FileCard({ file, onRetry }: FileCardProps) {
   };
 
   const getConversionProgress = () => {
+    // Use real-time progress for converting status (0-100%)
+    if (file.status === 'converting' && file.conversionProgress !== null && file.conversionProgress !== undefined) {
+      return file.conversionProgress;
+    }
+
+    // Show progress only for completed files, others show 0
     const statusProgress: Record<string, number> = {
       pending: 0,
-      queued: 25,
-      converting: 50,
-      uploading: 75,
+      queued: 0,
+      downloading: 0,
+      converting: 0,
+      uploading: 0,
       completed: 100,
       failed: 0,
     };

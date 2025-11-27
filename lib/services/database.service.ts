@@ -133,6 +133,18 @@ export class DatabaseService {
     return updatedFile;
   }
 
+  async updateConversionProgress(id: string, progress: number): Promise<File | undefined> {
+    const [file] = await db
+      .update(files)
+      .set({
+        conversionProgress: Math.min(100, Math.max(0, progress)),
+        updatedAt: new Date(),
+      })
+      .where(eq(files.id, id))
+      .returning();
+    return file;
+  }
+
   async deleteFile(id: string): Promise<void> {
     await db.delete(files).where(eq(files.id, id));
   }

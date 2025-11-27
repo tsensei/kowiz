@@ -44,6 +44,7 @@ export const files = pgTable('files', {
   status: varchar('status', { length: 50 }).notNull().default('pending'), // pending, queued, downloading, converting, uploading, completed, failed
   errorMessage: text('error_message'),
   retryCount: bigint('retry_count', { mode: 'number' }).default(0),
+  conversionProgress: integer('conversion_progress').default(0), // 0-100 percentage for real-time progress
   
   // Timestamps
   createdAt: timestamp('created_at').defaultNow().notNull(),
