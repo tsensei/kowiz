@@ -13,6 +13,7 @@ export type AuditAction =
   | 'user.login'
   | 'user.logout'
   | 'user.register'
+  | 'user.update_email'
   | 'admin.access'
   | 'system.cleanup'
   | 'system.requeue';

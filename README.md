@@ -128,6 +128,10 @@ NEXTAUTH_URL=http://localhost:3000
 # Wikimedia OAuth2
 AUTH_WIKIMEDIA_ID=your-wikimedia-client-id
 AUTH_WIKIMEDIA_SECRET=your-wikimedia-client-secret
+
+# Resend (email notifications)
+RESEND_API_KEY=your-resend-api-key
+RESEND_FROM_EMAIL=notification@kowiz.tsensei.dev
 ```
 
 4. **Set up Wikimedia OAuth2:**
@@ -266,6 +270,10 @@ NEXTAUTH_URL=http://localhost:3000
 # Wikimedia OAuth2
 AUTH_WIKIMEDIA_ID=your-wikimedia-client-id
 AUTH_WIKIMEDIA_SECRET=your-wikimedia-client-secret
+
+# Resend (email notifications)
+RESEND_API_KEY=your-resend-api-key
+RESEND_FROM_EMAIL=notification@kowiz.tsensei.dev
 ```
 
 ### Worker Concurrency

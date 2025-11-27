@@ -1,12 +1,15 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Upload, FileImage, FileVideo, FileAudio, File as FileIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { useUserProfile } from '@/hooks/use-user-profile';
 
 interface UploadResult {
   success: boolean;
@@ -26,11 +29,38 @@ interface FileDropzoneProps {
 }
 
 export function FileDropzone({ onUploadSuccess }: FileDropzoneProps) {
+  const { profile, loading: profileLoading, refresh: refreshProfile } = useUserProfile();
   const [uploading, setUploading] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadedBytes, setUploadedBytes] = useState(0);
   const [totalBytes, setTotalBytes] = useState(0);
+  const [notifyOnComplete, setNotifyOnComplete] = useState(false);
+  const [userToggledNotification, setUserToggledNotification] = useState(false);
+  const notificationLimit = profile?.notificationQuota.limit ?? 5;
+  const remainingNotifications = profile?.notificationQuota.remaining ?? 0;
+  const notificationsAvailable = !!profile?.email && remainingNotifications > 0;
+  const notificationsDisabledReason = !profile?.email
+    ? 'Add an email in your profile to enable notifications.'
+    : remainingNotifications <= 0
+      ? `You have used all ${notificationLimit}/${notificationLimit} email notifications for today.`
+      : '';
+
+  useEffect(() => {
+    if (!userToggledNotification && profile?.email && (profile.notificationQuota.remaining ?? 0) > 0) {
+      setNotifyOnComplete(true);
+    }
+
+    if ((profile?.notificationQuota.remaining ?? 0) <= 0 || !profile?.email) {
+      setNotifyOnComplete(false);
+    }
+  }, [profile?.email, profile?.notificationQuota.remaining, userToggledNotification]);
+
+  useEffect(() => {
+    const listener = () => refreshProfile();
+    window.addEventListener('kowiz-profile-updated', listener);
+    return () => window.removeEventListener('kowiz-profile-updated', listener);
+  }, [refreshProfile]);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     setSelectedFiles((prev) => [...prev, ...acceptedFiles]);
@@ -84,6 +114,8 @@ export function FileDropzone({ onUploadSuccess }: FileDropzoneProps) {
       selectedFiles.forEach((file) => {
         formData.append('files', file);
       });
+      const shouldRequestNotification = notifyOnComplete && notificationsAvailable;
+      formData.append('notifyOnComplete', shouldRequestNotification ? 'true' : 'false');
 
       const response = await new Promise<UploadResponse>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
@@ -141,6 +173,13 @@ export function FileDropzone({ onUploadSuccess }: FileDropzoneProps) {
       } else {
         // All succeeded
         toast.success(`Successfully uploaded ${response.successfulUploads} file(s)!`);
+      }
+
+      if (shouldRequestNotification) {
+        toast.message('Notification scheduled', {
+          description: `We will email ${profile?.email} when this batch finishes.`,
+        });
+        refreshProfile();
       }
 
       // Clear successfully uploaded files
@@ -253,6 +292,31 @@ export function FileDropzone({ onUploadSuccess }: FileDropzoneProps) {
             </Button>
           </div>
 
+          <div className="flex items-start gap-3 rounded-lg border bg-muted/40 p-3">
+            <Checkbox
+              id="notify-on-complete"
+              checked={notifyOnComplete && notificationsAvailable}
+              disabled={uploading || !notificationsAvailable}
+              onCheckedChange={(checked) => {
+                setUserToggledNotification(true);
+                setNotifyOnComplete(Boolean(checked));
+              }}
+            />
+            <div className="space-y-1">
+              <Label htmlFor="notify-on-complete" className="font-medium">
+                Email me when this batch finishes
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {profileLoading
+                  ? 'Checking notification quota...'
+                  : `You have ${remainingNotifications} of ${notificationLimit} notifications left today.`}
+              </p>
+              {!notificationsAvailable && notificationsDisabledReason && (
+                <p className="text-xs text-destructive">{notificationsDisabledReason}</p>
+              )}
+            </div>
+          </div>
+
           {uploading && (
             <div className="space-y-1">
               <div className="flex justify-between text-xs text-muted-foreground">
@@ -294,4 +358,3 @@ export function FileDropzone({ onUploadSuccess }: FileDropzoneProps) {
     </div>
   );
 }
-

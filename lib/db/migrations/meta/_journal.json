@@ -50,6 +50,13 @@
       "when": 1764136376283,
       "tag": "0006_daffy_maggott",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1765000000000,
+      "tag": "0007_upload_notifications",
+      "breakpoints": true
     }
   ]
 }

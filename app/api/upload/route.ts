@@ -7,6 +7,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { v4 as uuidv4 } from 'uuid';
 import { logAudit } from '@/lib/audit';
+import { notificationService } from '@/lib/services/notification.service';
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,13 +21,39 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = session.user.id;
+    const user = await databaseService.getUserById(userId);
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
 
     const formData = await request.formData();
     const uploadedFiles = formData.getAll('files') as File[];
+    const notifyOnComplete = formData.get('notifyOnComplete') === 'true';
 
     if (!uploadedFiles || uploadedFiles.length === 0) {
       return NextResponse.json({ error: 'No files provided' }, { status: 400 });
     }
+
+    if (notifyOnComplete && !user.email) {
+      return NextResponse.json(
+        { error: 'Email required for notifications. Please add an email in your profile.' },
+        { status: 400 }
+      );
+    }
+
+    const notificationStats = notifyOnComplete
+      ? await notificationService.getDailyStats(userId)
+      : null;
+
+    if (notifyOnComplete && notificationStats && notificationStats.remaining <= 0) {
+      return NextResponse.json(
+        { error: 'Daily notification limit reached', limit: notificationStats.limit },
+        { status: 429 }
+      );
+    }
+
+    const batchId = notifyOnComplete ? uuidv4() : null;
 
     const results = [];
 
@@ -61,6 +88,8 @@ export async function POST(request: NextRequest) {
             needsConversion: formatInfo.needsConversion ? 'true' : 'false',
             rawFilePath: rawFileName,
             status: 'pending',
+            batchId: batchId || undefined,
+            notifyOnComplete: notifyOnComplete,
           });
         } catch (dbError) {
           console.error(`Database creation failed for ${file.name}:`, dbError);
@@ -192,6 +221,15 @@ export async function POST(request: NextRequest) {
     const successCount = results.filter((r) => r.success).length;
     const failureCount = results.filter((r) => !r.success).length;
 
+    if (notifyOnComplete && batchId && successCount > 0 && user.email) {
+      await notificationService.createRequest({
+        userId,
+        batchId,
+        email: user.email,
+        totalFiles: successCount,
+      });
+    }
+
     return NextResponse.json({
       success: successCount > 0,
       results,
@@ -210,4 +248,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

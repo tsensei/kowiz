@@ -1,101 +1,93 @@
-# Production deployment with self-hosted infrastructure
-# Includes PostgreSQL, MinIO, Web, Worker, and Migration
-
 services:
   postgres:
-    image: postgres:16-alpine
-    container_name: kowiz-postgres-prod
+    image: 'postgres:16-alpine'
+    pull_policy: always
     environment:
-      POSTGRES_USER: ${DATABASE_USER:-postgres}
-      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
-      POSTGRES_DB: ${DATABASE_NAME:-kowiz}
+      POSTGRES_USER: '${DATABASE_USER:-postgres}'
+      POSTGRES_PASSWORD: '${DATABASE_PASSWORD}'
+      POSTGRES_DB: '${DATABASE_NAME:-kowiz}'
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - 'postgres_data:/var/lib/postgresql/data'
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-postgres}"]
+      test:
+        - CMD-SHELL
+        - 'pg_isready -U ${DATABASE_USER:-postgres}'
       interval: 5s
       timeout: 5s
       retries: 5
     restart: unless-stopped
-    networks:
-      - kowiz-network
-
   minio:
-    image: minio/minio:latest
-    container_name: kowiz-minio-prod
-    command: server /data --console-address ":9001"
+    image: 'minio/minio:latest'
+    pull_policy: always
+    command: 'server /data --console-address ":9001"'
     environment:
-      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+      MINIO_ROOT_USER: '${MINIO_ACCESS_KEY}'
+      MINIO_ROOT_PASSWORD: '${MINIO_SECRET_KEY}'
     volumes:
-      - minio_data:/data
+      - 'minio_data:/data'
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - '9000:9000'
+      - '9001:9001'
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test:
+        - CMD
+        - curl
+        - '-f'
+        - 'http://localhost:9000/minio/health/live'
       interval: 5s
       timeout: 5s
       retries: 5
     restart: unless-stopped
-    networks:
-      - kowiz-network
-
   minio-setup:
-    image: minio/mc:latest
-    container_name: kowiz-minio-setup-prod
+    image: 'minio/mc:latest'
+    pull_policy: always
     depends_on:
       minio:
         condition: service_healthy
-    entrypoint: >
-      /bin/sh -c "
-      mc alias set myminio http://minio:9000 ${MINIO_ACCESS_KEY} ${MINIO_SECRET_KEY};
-      mc mb myminio/raw-files --ignore-existing;
-      mc mb myminio/processed-files --ignore-existing;
-      mc anonymous set download myminio/raw-files;
-      mc anonymous set download myminio/processed-files;
-      exit 0;
-      "
-    networks:
-      - kowiz-network
-
+    entrypoint: "/bin/sh -c \" mc alias set myminio http://minio:9000 ${MINIO_ACCESS_KEY} ${MINIO_SECRET_KEY}; mc mb myminio/raw-files --ignore-existing; mc mb myminio/processed-files --ignore-existing; mc anonymous set download myminio/raw-files; mc anonymous set download myminio/processed-files; exit 0; \"\n"
   migrate:
-    image: ${REGISTRY_URL}/kowiz-worker:latest
-    container_name: kowiz-migrate-prod
+    image: '${REGISTRY_URL}/kowiz-worker:latest'
+    pull_policy: always
     environment:
       DATABASE_HOST: postgres
       DATABASE_PORT: 5432
-      DATABASE_USER: ${DATABASE_USER:-postgres}
-      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
-      DATABASE_NAME: ${DATABASE_NAME:-kowiz}
-    command: sh -c "sleep 10 && pnpm drizzle-kit push"
+      DATABASE_USER: '${DATABASE_USER:-postgres}'
+      DATABASE_PASSWORD: '${DATABASE_PASSWORD}'
+      DATABASE_NAME: '${DATABASE_NAME:-kowiz}'
+    command: 'sh -c "sleep 10 && pnpm drizzle-kit push --force"'
     depends_on:
       postgres:
         condition: service_healthy
-    networks:
-      - kowiz-network
-    restart: "no"
-
+    restart: 'no'
   web:
-    image: ${REGISTRY_URL}/kowiz-web:latest
-    container_name: kowiz-web-prod
+    image: '${REGISTRY_URL}/kowiz-web:latest'
+    pull_policy: always
     environment:
+      SERVICE_URL_WEB_3000: 'https://app.kowiz.tsensei.dev'
       DATABASE_HOST: postgres
       DATABASE_PORT: 5432
-      DATABASE_USER: ${DATABASE_USER:-postgres}
-      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
-      DATABASE_NAME: ${DATABASE_NAME:-kowiz}
+      DATABASE_USER: '${DATABASE_USER:-postgres}'
+      DATABASE_PASSWORD: '${DATABASE_PASSWORD}'
+      DATABASE_NAME: '${DATABASE_NAME:-kowiz}'
       MINIO_ENDPOINT: minio
       MINIO_PORT: 9000
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_ACCESS_KEY: '${MINIO_ACCESS_KEY}'
+      MINIO_SECRET_KEY: '${MINIO_SECRET_KEY}'
       MINIO_USE_SSL: false
+      RESEND_API_KEY: '${RESEND_API_KEY}'
+      RESEND_FROM_EMAIL: '${RESEND_FROM_EMAIL}'
       NODE_ENV: production
     ports:
-      - "${PORT:-3000}:3000"
+      - '${PORT:-3000}:3000'
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/files"]
+      test:
+        - CMD
+        - wget
+        - '--quiet'
+        - '--tries=1'
+        - '--spider'
+        - 'http://localhost:3000/api/files'
       interval: 30s
       timeout: 10s
       retries: 3
@@ -107,23 +99,22 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
-    networks:
-      - kowiz-network
-
   worker:
-    image: ${REGISTRY_URL}/kowiz-worker:latest
-    container_name: kowiz-worker-prod
+    image: '${REGISTRY_URL}/kowiz-worker:latest'
+    pull_policy: always
     environment:
       DATABASE_HOST: postgres
       DATABASE_PORT: 5432
-      DATABASE_USER: ${DATABASE_USER:-postgres}
-      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
-      DATABASE_NAME: ${DATABASE_NAME:-kowiz}
+      DATABASE_USER: '${DATABASE_USER:-postgres}'
+      DATABASE_PASSWORD: '${DATABASE_PASSWORD}'
+      DATABASE_NAME: '${DATABASE_NAME:-kowiz}'
       MINIO_ENDPOINT: minio
       MINIO_PORT: 9000
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_ACCESS_KEY: '${MINIO_ACCESS_KEY}'
+      MINIO_SECRET_KEY: '${MINIO_SECRET_KEY}'
       MINIO_USE_SSL: false
+      RESEND_API_KEY: '${RESEND_API_KEY}'
+      RESEND_FROM_EMAIL: '${RESEND_FROM_EMAIL}'
       NODE_ENV: production
     restart: unless-stopped
     depends_on:
@@ -133,16 +124,6 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
-    networks:
-      - kowiz-network
-    deploy:
-      replicas: 2  # Run 2 worker instances for better throughput
-
-networks:
-  kowiz-network:
-    driver: bridge
-
 volumes:
-  postgres_data:
-  minio_data:
-
+  postgres_data: null
+  minio_data: null

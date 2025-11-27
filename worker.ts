@@ -1,3 +1,8 @@
+// Load environment variables FIRST before any imports
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
+dotenv.config();
+
 import { PgBoss } from 'pg-boss';
 import type { Job } from 'pg-boss';
 import * as fs from 'fs/promises';
@@ -6,6 +11,11 @@ import { databaseService } from './lib/services/database.service';
 import { minioService, BUCKETS } from './lib/services/minio.service';
 import { conversionService } from './lib/services/conversion.service';
 import { urlDownloadService } from './lib/services/url-download.service';
+import { notificationService } from './lib/services/notification.service';
+import type { File as DbFile } from './lib/db/schema';
+
+console.log('[worker] ENV check: RESEND_API_KEY', process.env.RESEND_API_KEY ? 'present' : 'missing');
+console.log('[worker] ENV check: RESEND_FROM_EMAIL', process.env.RESEND_FROM_EMAIL || 'not set');
 
 const connectionString = `postgresql://${process.env.DATABASE_USER || 'postgres'}:${process.env.DATABASE_PASSWORD || 'postgres'}@${process.env.DATABASE_HOST || 'localhost'}:${process.env.DATABASE_PORT || 5432}/${process.env.DATABASE_NAME || 'kowiz'}`;
 
@@ -25,9 +35,11 @@ async function processConversionJob(jobs: Job<ConversionJobData>[]) {
       console.log(`Attempt: ${(job as any).attemptsmade + 1}`);
     }
 
+    let fileRecord: DbFile | undefined;
+
     try {
       // Get file details from database
-      const fileRecord = await databaseService.getFileById(fileId);
+      fileRecord = await databaseService.getFileById(fileId);
       if (!fileRecord) {
         throw new Error(`File record not found: ${fileId}`);
       }
@@ -116,6 +128,9 @@ async function processConversionJob(jobs: Job<ConversionJobData>[]) {
       if (fileRecord.needsConversion === 'false' || !fileRecord.targetFormat) {
         console.log('✓ No conversion needed - file is already in supported format');
         await databaseService.updateFileStatus(fileId, 'completed');
+        if (fileRecord.notifyOnComplete) {
+          await notificationService.checkAndSendForBatch(fileRecord.batchId || undefined);
+        }
         // Job completes automatically when function returns without error
         return { success: true, fileId, converted: false };
       }
@@ -182,6 +197,10 @@ async function processConversionJob(jobs: Job<ConversionJobData>[]) {
       console.log(`✓ File ${fileName} processed successfully!`);
       console.log('=================================\n');
 
+      if (fileRecord.notifyOnComplete) {
+        await notificationService.checkAndSendForBatch(fileRecord.batchId || undefined);
+      }
+
       // Job completes automatically when function returns without error
       return { success: true, fileId, converted: true };
     } catch (error) {
@@ -200,6 +219,9 @@ async function processConversionJob(jobs: Job<ConversionJobData>[]) {
         const finalErrorMessage = `Failed after ${maxRetries} attempts: ${errorMessage}`;
         await databaseService.updateFileStatus(fileId, 'failed', finalErrorMessage);
         console.error(`❌ Maximum retry attempts (${maxRetries}) reached. Marking as permanently failed.`);
+        if (fileRecord?.notifyOnComplete) {
+          await notificationService.checkAndSendForBatch(fileRecord.batchId || undefined);
+        }
         console.log('=================================\n');
         // Don't throw - let pg-boss mark job as failed
         return { success: false, fileId, error: finalErrorMessage };
@@ -277,4 +299,3 @@ process.on('unhandledRejection', (error) => {
 
 // Start the worker
 startWorker();
-

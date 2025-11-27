@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, bigint, timestamp, text, boolean, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, bigint, timestamp, text, boolean, jsonb, integer } from 'drizzle-orm/pg-core';
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -33,6 +33,8 @@ export const files = pgTable('files', {
   // Import tracking
   importSource: varchar('import_source', { length: 50 }).notNull().default('upload'), // upload, youtube, direct_url
   sourceUrl: text('source_url'), // Original URL if imported
+  batchId: varchar('batch_id', { length: 255 }), // upload batch identifier
+  notifyOnComplete: boolean('notify_on_complete').notNull().default(false),
   
   // Storage paths
   rawFilePath: varchar('raw_file_path', { length: 500 }).notNull(), // path in raw-files bucket
@@ -48,6 +50,19 @@ export const files = pgTable('files', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
   convertedAt: timestamp('converted_at'),
   uploadedAt: timestamp('uploaded_at'),
+});
+
+export const notificationRequests = pgTable('notification_requests', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  batchId: varchar('batch_id', { length: 255 }).notNull().unique(),
+  email: varchar('email', { length: 255 }).notNull(),
+  totalFiles: integer('total_files').notNull(),
+  status: varchar('status', { length: 50 }).notNull().default('pending'), // pending, sent, failed
+  sentAt: timestamp('sent_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  lastError: text('last_error'),
 });
 
 export const auditLogs = pgTable('audit_logs', {
@@ -72,3 +87,5 @@ export type NewFile = typeof files.$inferInsert;
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type NewAuditLog = typeof auditLogs.$inferInsert;
 
+export type NotificationRequest = typeof notificationRequests.$inferSelect;
+export type NewNotificationRequest = typeof notificationRequests.$inferInsert;

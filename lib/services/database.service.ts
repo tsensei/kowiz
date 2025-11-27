@@ -1,8 +1,22 @@
 import { db } from '../db';
-import { files, type File, type NewFile } from '../db/schema';
+import { files, type File, type NewFile, users, type User } from '../db/schema';
 import { eq, desc, and, sql } from 'drizzle-orm';
 
 export class DatabaseService {
+  async getUserById(id: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  async updateUserEmail(id: string, email: string): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({ email, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return user;
+  }
+
   async createFile(fileData: NewFile): Promise<File> {
     const [file] = await db.insert(files).values(fileData).returning();
     return file;
@@ -125,4 +139,3 @@ export class DatabaseService {
 }
 
 export const databaseService = new DatabaseService();
-
