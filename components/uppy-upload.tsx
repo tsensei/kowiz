@@ -93,9 +93,8 @@ export function UppyUpload({ onUploadSuccess }: UppyUploadProps) {
         proudlyDisplayPoweredByUppy: false,
         note: 'Supported formats: Images (HEIC, HEIF, WebP, RAW, JPEG, PNG), Videos (MP4, MOV, AVI, MKV), Audio (MP3, AAC, M4A, WAV)',
         height: 400,
-        showProgressDetails: true,
+        hideProgressDetails: false,
         hideUploadButton: false,
-        doneButtonHandler: null,
         theme: 'auto',
         fileManagerSelectionType: 'both',
       });
