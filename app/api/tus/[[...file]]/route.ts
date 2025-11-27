@@ -140,11 +140,27 @@ async function handleTusRequest(req: NextRequest): Promise<NextResponse> {
       const tusResponse = await tusServer.handleWeb(standardReq);
       console.log(`[TUS] POST Response status: ${tusResponse.status}`);
 
+      // Fix Location header to use HTTPS in production
+      const responseHeaders = new Headers(tusResponse.headers);
+      const location = responseHeaders.get('location');
+      if (location && location.startsWith('http://')) {
+        // Get the proper protocol from the request or environment
+        const protocol = req.headers.get('x-forwarded-proto') || 'https';
+        const host = req.headers.get('host') || req.headers.get('x-forwarded-host');
+
+        if (protocol === 'https' && host) {
+          // Replace http:// with https:// using the request's host
+          const fixedLocation = location.replace(/^http:\/\/[^/]+/, `https://${host}`);
+          responseHeaders.set('location', fixedLocation);
+          console.log(`[TUS] Fixed Location header: ${location} -> ${fixedLocation}`);
+        }
+      }
+
       // Convert to NextResponse
       return new NextResponse(tusResponse.body, {
         status: tusResponse.status,
         statusText: tusResponse.statusText,
-        headers: tusResponse.headers,
+        headers: responseHeaders,
       });
     }
 
