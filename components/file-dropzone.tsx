@@ -82,8 +82,13 @@ export function FileDropzone({ onUploadSuccess }: FileDropzoneProps) {
   // Initialize Uppy TUS plugin
   useEffect(() => {
     if (!uppy.getPlugin('Tus')) {
+      // Use absolute URL with proper protocol to avoid mixed content issues
+      const endpoint = typeof window !== 'undefined'
+        ? `${window.location.protocol}//${window.location.host}/api/tus`
+        : '/api/tus';
+
       uppy.use(Tus, {
-        endpoint: '/api/tus',
+        endpoint,
         retryDelays: [0, 1000, 3000, 5000, 10000],
         chunkSize: 5 * 1024 * 1024,
         removeFingerprintOnSuccess: true,
