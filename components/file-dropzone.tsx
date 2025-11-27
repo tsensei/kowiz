@@ -10,6 +10,8 @@ import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { useUserProfile } from '@/hooks/use-user-profile';
+import Uppy from '@uppy/core';
+import Tus from '@uppy/tus';
 
 interface UploadResult {
   success: boolean;
@@ -46,6 +48,21 @@ export function FileDropzone({ onUploadSuccess }: FileDropzoneProps) {
       ? `You have used all ${notificationLimit}/${notificationLimit} email notifications for today.`
       : '';
 
+  // Initialize Uppy instance
+  const [uppy] = useState(() => {
+    const uppyInstance = new Uppy({
+      restrictions: {
+        allowedFileTypes: [
+          'image/*', 'video/*', 'audio/*',
+          '.heic', '.heif', '.cr2', '.cr3', '.nef', '.arw', '.dng', '.rw2', '.orf', '.raf'
+        ],
+      },
+      autoProceed: false,
+    });
+
+    return uppyInstance;
+  });
+
   useEffect(() => {
     if (!userToggledNotification && profile?.email && (profile.notificationQuota.remaining ?? 0) > 0) {
       setNotifyOnComplete(true);
@@ -61,6 +78,101 @@ export function FileDropzone({ onUploadSuccess }: FileDropzoneProps) {
     window.addEventListener('kowiz-profile-updated', listener);
     return () => window.removeEventListener('kowiz-profile-updated', listener);
   }, [refreshProfile]);
+
+  // Initialize Uppy TUS plugin
+  useEffect(() => {
+    if (!uppy.getPlugin('Tus')) {
+      uppy.use(Tus, {
+        endpoint: '/api/tus',
+        retryDelays: [0, 1000, 3000, 5000, 10000],
+        chunkSize: 5 * 1024 * 1024,
+        removeFingerprintOnSuccess: true,
+      });
+    }
+
+    // Track progress with better granularity
+    const handleProgress = (progress: number) => {
+      setUploadProgress(progress);
+    };
+
+    // Track individual file upload progress for accurate byte count
+    const handleFileProgress = (file: any, progress: any) => {
+      const files = uppy.getFiles();
+      const totalSize = files.reduce((sum, f) => sum + (f.size || 0), 0);
+
+      // Calculate total uploaded bytes across all files
+      let totalUploaded = 0;
+      files.forEach((f) => {
+        const fileProgress = f.progress?.percentage || 0;
+        const fileSize = f.size || 0;
+        totalUploaded += Math.floor((fileProgress / 100) * fileSize);
+      });
+
+      setUploadedBytes(totalUploaded);
+      setTotalBytes(totalSize);
+    };
+
+    // Handle upload success
+    const handleUploadSuccess = (file: any) => {
+      if (file) {
+        toast.success(`${file.name} uploaded successfully!`);
+      }
+    };
+
+    // Handle completion
+    const handleComplete = (result: any) => {
+      const successful = result.successful?.length || 0;
+      const failed = result.failed?.length || 0;
+
+      setUploading(false);
+      setUploadProgress(0);
+      setUploadedBytes(0);
+      setTotalBytes(0);
+
+      if (failed > 0) {
+        toast.warning(`${successful} of ${successful + failed} files uploaded successfully`);
+        result.failed?.forEach((file: any) => {
+          toast.error(`${file.name}: ${file.error || 'Upload failed'}`);
+        });
+      } else if (successful > 0) {
+        toast.success(`Successfully uploaded ${successful} file(s)!`);
+
+        if (notifyOnComplete && notificationsAvailable) {
+          toast.message('Notification scheduled', {
+            description: `We will email ${profile?.email} when this batch finishes.`,
+          });
+          refreshProfile();
+        }
+      }
+
+      // Clear files from Uppy and our state
+      uppy.cancelAll();
+      setSelectedFiles([]);
+
+      if (successful > 0) {
+        onUploadSuccess();
+      }
+    };
+
+    const handleError = (file: any, error: any) => {
+      console.error('Upload error:', error);
+      toast.error(`Failed to upload ${file?.name}: ${error.message}`);
+    };
+
+    uppy.on('progress', handleProgress);
+    uppy.on('upload-progress', handleFileProgress);
+    uppy.on('upload-success', handleUploadSuccess);
+    uppy.on('complete', handleComplete);
+    uppy.on('upload-error', handleError);
+
+    return () => {
+      uppy.off('progress', handleProgress);
+      uppy.off('upload-progress', handleFileProgress);
+      uppy.off('upload-success', handleUploadSuccess);
+      uppy.off('complete', handleComplete);
+      uppy.off('upload-error', handleError);
+    };
+  }, [uppy, onUploadSuccess, notifyOnComplete, notificationsAvailable, profile?.email, refreshProfile]);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     setSelectedFiles((prev) => [...prev, ...acceptedFiles]);
@@ -110,100 +222,23 @@ export function FileDropzone({ onUploadSuccess }: FileDropzoneProps) {
     setTotalBytes(0);
 
     try {
-      const formData = new FormData();
+      // Add files to Uppy
       selectedFiles.forEach((file) => {
-        formData.append('files', file);
-      });
-      const shouldRequestNotification = notifyOnComplete && notificationsAvailable;
-      formData.append('notifyOnComplete', shouldRequestNotification ? 'true' : 'false');
-
-      const response = await new Promise<UploadResponse>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', '/api/upload');
-
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) {
-            setUploadProgress((event.loaded / event.total) * 100);
-            setUploadedBytes(event.loaded);
-            setTotalBytes(event.total);
-          }
-        };
-
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            try {
-              const data = JSON.parse(xhr.responseText);
-              resolve(data);
-            } catch (e) {
-              reject(new Error('Invalid JSON response'));
-            }
-          } else {
-            try {
-              const data = JSON.parse(xhr.responseText);
-              reject(new Error(data.error || 'Upload failed'));
-            } catch (e) {
-              reject(new Error('Upload failed'));
-            }
-          }
-        };
-
-        xhr.onerror = () => reject(new Error('Network error'));
-        xhr.send(formData);
+        uppy.addFile({
+          name: file.name,
+          type: file.type,
+          data: file,
+          meta: {
+            notifyOnComplete: (notifyOnComplete && notificationsAvailable) ? 'true' : 'false',
+          },
+        });
       });
 
-      // Show detailed feedback
-      if (response.failedUploads > 0) {
-        // Some files failed
-        const failedFiles = response.results
-          .filter((r) => !r.success)
-          .map((r) => r.fileName)
-          .join(', ');
-
-        toast.warning(
-          `${response.successfulUploads} of ${response.totalFiles} files uploaded. Failed: ${failedFiles}`,
-          { duration: 5000 }
-        );
-
-        // Show individual error details
-        response.results.forEach((result) => {
-          if (!result.success) {
-            toast.error(`${result.fileName}: ${result.error}`, { duration: 4000 });
-          }
-        });
-      } else {
-        // All succeeded
-        toast.success(`Successfully uploaded ${response.successfulUploads} file(s)!`);
-      }
-
-      if (shouldRequestNotification) {
-        toast.message('Notification scheduled', {
-          description: `We will email ${profile?.email} when this batch finishes.`,
-        });
-        refreshProfile();
-      }
-
-      // Clear successfully uploaded files
-      if (response.successfulUploads > 0) {
-        const failedFileNames = response.results
-          .filter((r) => !r.success)
-          .map((r) => r.fileName);
-
-        setSelectedFiles((prev) =>
-          prev.filter((file) => failedFileNames.includes(file.name))
-        );
-
-        // If all uploaded successfully, reset file input
-        if (failedFileNames.length === 0) {
-          const fileInput = document.getElementById('file-input') as HTMLInputElement;
-          if (fileInput) fileInput.value = '';
-        }
-      }
-
-      onUploadSuccess();
+      // Start upload
+      await uppy.upload();
     } catch (error) {
       console.error('Upload error:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to upload files');
-    } finally {
       setUploading(false);
       setUploadProgress(0);
     }

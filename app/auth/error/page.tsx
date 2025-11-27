@@ -8,7 +8,7 @@ import Link from "next/link";
 
 function ErrorContent() {
   const searchParams = useSearchParams();
-  const error = searchParams.get("error");
+  const error = searchParams?.get("error");
 
   const errorMessages: Record<string, string> = {
     Configuration: "There is a problem with the server configuration.",

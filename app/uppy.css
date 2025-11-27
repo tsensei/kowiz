@@ -1,0 +1,105 @@
+@import '../node_modules/@uppy/core/dist/style.min.css';
+@import '../node_modules/@uppy/dashboard/dist/style.min.css';
+
+/* Custom Uppy styling to match original design */
+.uppy-Dashboard {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.uppy-Dashboard-inner {
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  width: 100% !important;
+}
+
+.uppy-Dashboard-innerWrap {
+  background: transparent !important;
+  width: 100% !important;
+}
+
+.uppy-Dashboard-AddFiles {
+  border: none !important;
+  background: transparent !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: center !important;
+  padding: 2rem !important;
+}
+
+.uppy-Dashboard-AddFiles-title {
+  font-size: 1.125rem !important;
+  font-weight: 600 !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+.uppy-Dashboard-note {
+  font-size: 0.75rem !important;
+  color: hsl(var(--muted-foreground)) !important;
+  max-width: 500px !important;
+  margin: 0.5rem auto 0 !important;
+}
+
+/* Hide Uppy branding and unnecessary elements */
+.uppy-Dashboard-poweredBy {
+  display: none !important;
+}
+
+.uppy-Dashboard-AddFiles-info {
+  margin-top: 0.5rem !important;
+  text-align: center !important;
+}
+
+/* Drag active state */
+.uppy-Dashboard--isDraggingOver .uppy-Dashboard-inner {
+  border-color: hsl(var(--primary)) !important;
+  background: hsl(var(--primary) / 0.05) !important;
+}
+
+/* Upload icon styling */
+.uppy-Dashboard-AddFiles .uppy-c-icon {
+  width: 2.5rem !important;
+  height: 2.5rem !important;
+  margin-bottom: 1rem !important;
+  color: hsl(var(--primary)) !important;
+}
+
+/* File list styling */
+.uppy-Dashboard-files {
+  margin-top: 1rem !important;
+}
+
+.uppy-Dashboard-Item {
+  border-radius: 0.5rem !important;
+  border: 1px solid hsl(var(--border)) !important;
+  background: hsl(var(--card)) !important;
+  margin-bottom: 0.5rem !important;
+}
+
+/* Progress bar */
+.uppy-ProgressBar {
+  height: 0.5rem !important;
+  background: hsl(var(--primary)) !important;
+}
+
+/* Button styling */
+.uppy-StatusBar-actionBtn--upload {
+  background: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
+  font-weight: 500 !important;
+  border-radius: 0.375rem !important;
+  padding: 0.5rem 1rem !important;
+}
+
+.uppy-StatusBar-actionBtn--upload:hover {
+  opacity: 0.9 !important;
+}
+
+/* Status bar */
+.uppy-StatusBar {
+  background: transparent !important;
+  border-top: 1px solid hsl(var(--border)) !important;
+  padding-top: 1rem !important;
+}

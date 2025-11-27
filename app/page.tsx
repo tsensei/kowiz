@@ -18,7 +18,7 @@ function HomeContent() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const currentTab = searchParams.get('tab') || 'upload';
+  const currentTab = searchParams?.get('tab') || 'upload';
   const [files, setFiles] = useState<File[]>([]);
   const [loading, setLoading] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(() => {
