@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, Download, FileCheck, Pencil, Music, MoreHorizontal, Loader2 } from 'lucide-react';
+import { Search, Download, FileCheck, Pencil, Music, MoreHorizontal, Loader2, Globe } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -22,6 +22,9 @@ const ImageEditorModal = dynamic(() => import('./image-editor-modal'), {
 const AudioEditorModal = dynamic(() => import('./audio-editor-modal'), {
   ssr: false,
 });
+const CommonsPublishWizard = dynamic(() => import('./commons-publish-wizard').then(mod => ({ default: mod.CommonsPublishWizard })), {
+  ssr: false,
+});
 import { toast } from 'sonner';
 import type { File } from '@/lib/db/schema';
 
@@ -34,6 +37,7 @@ export function CompletedTab({ files: initialFiles }: CompletedTabProps) {
   const [downloading, setDownloading] = useState<string | null>(null);
   const [editingFile, setEditingFile] = useState<File | null>(null);
   const [editingAudioFile, setEditingAudioFile] = useState<File | null>(null);
+  const [publishingFiles, setPublishingFiles] = useState<File[]>([]);
 
   // Pagination state
   const [data, setData] = useState<File[]>([]);
@@ -132,6 +136,12 @@ export function CompletedTab({ files: initialFiles }: CompletedTabProps) {
       toast.error('Failed to generate bulk download');
     }
   }, [rowSelection]);
+
+  const handleBulkPublishToCommons = useCallback(() => {
+    const selectedFileIds = Object.keys(rowSelection);
+    const selectedFiles = data.filter((file) => selectedFileIds.includes(file.id));
+    setPublishingFiles(selectedFiles);
+  }, [rowSelection, data]);
 
   const formatSize = useCallback((bytes: number) => {
     if (bytes === 0) return '0 B';
@@ -256,6 +266,11 @@ export function CompletedTab({ files: initialFiles }: CompletedTabProps) {
                   Edit Audio
                 </DropdownMenuItem>
               )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setPublishingFiles([file])}>
+                <Globe className="mr-2 h-4 w-4" />
+                Publish to Commons
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         );
@@ -308,11 +323,18 @@ export function CompletedTab({ files: initialFiles }: CompletedTabProps) {
             {selectedCount} selected
           </span>
           <div className="h-4 w-px bg-border" />
-          <Button size="sm" onClick={() => handleBulkDownload('raw')}>
+          <Button size="sm" variant="outline" onClick={() => handleBulkDownload('raw')}>
+            <Download className="h-4 w-4 mr-2" />
             Download Original
           </Button>
-          <Button size="sm" onClick={() => handleBulkDownload('converted')}>
+          <Button size="sm" variant="outline" onClick={() => handleBulkDownload('converted')}>
+            <Download className="h-4 w-4 mr-2" />
             Download Converted
+          </Button>
+          <div className="h-4 w-px bg-border" />
+          <Button size="sm" onClick={handleBulkPublishToCommons}>
+            <Globe className="h-4 w-4 mr-2" />
+            Publish to Commons
           </Button>
         </div>
       )}
@@ -334,6 +356,18 @@ export function CompletedTab({ files: initialFiles }: CompletedTabProps) {
           onClose={() => setEditingAudioFile(null)}
           audioUrl={`/api/files/${editingAudioFile.id}/stream?type=${editingAudioFile.processedFilePath ? 'converted' : 'raw'}`}
           fileName={editingAudioFile.name}
+        />
+      )}
+
+      {/* Commons Publish Wizard */}
+      {publishingFiles.length > 0 && (
+        <CommonsPublishWizard
+          isOpen={publishingFiles.length > 0}
+          onClose={() => {
+            setPublishingFiles([]);
+            setRowSelection({}); // Clear selection after publish
+          }}
+          files={publishingFiles}
         />
       )}
     </div>

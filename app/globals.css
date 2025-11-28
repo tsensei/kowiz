@@ -119,4 +119,10 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Sonner toast styles - make descriptions more visible */
+  [data-sonner-toast] [data-description] {
+    @apply text-foreground/80 dark:text-foreground/80;
+    opacity: 0.8;
+  }
 }

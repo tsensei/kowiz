@@ -71,11 +71,19 @@ services:
       DATABASE_NAME: '${DATABASE_NAME:-kowiz}'
       MINIO_ENDPOINT: minio
       MINIO_PORT: 9000
+      MINIO_REGION: '${MINIO_REGION:-us-east-1}'
       MINIO_ACCESS_KEY: '${MINIO_ACCESS_KEY}'
       MINIO_SECRET_KEY: '${MINIO_SECRET_KEY}'
       MINIO_USE_SSL: false
+      AUTH_WIKIMEDIA_ID: '${AUTH_WIKIMEDIA_ID}'
+      AUTH_WIKIMEDIA_SECRET: '${AUTH_WIKIMEDIA_SECRET}'
+      AUTH_SECRET: '${AUTH_SECRET}'
       RESEND_API_KEY: '${RESEND_API_KEY}'
       RESEND_FROM_EMAIL: '${RESEND_FROM_EMAIL}'
+      ENABLE_AI_ASSISTANCE: '${ENABLE_AI_ASSISTANCE:-false}'
+      GEMINI_API_KEY: '${GEMINI_API_KEY}'
+      COMMONS_API_ENDPOINT: '${COMMONS_API_ENDPOINT:-https://commons.wikimedia.org/w/api.php}'
+      COMMONS_USER_AGENT: '${COMMONS_USER_AGENT:-KOWiz/1.0 (https://kowiz.app)}'
       NODE_ENV: production
     ports:
       - '${PORT:-3000}:3000'
@@ -110,6 +118,7 @@ services:
       DATABASE_NAME: '${DATABASE_NAME:-kowiz}'
       MINIO_ENDPOINT: minio
       MINIO_PORT: 9000
+      MINIO_REGION: '${MINIO_REGION:-us-east-1}'
       MINIO_ACCESS_KEY: '${MINIO_ACCESS_KEY}'
       MINIO_SECRET_KEY: '${MINIO_SECRET_KEY}'
       MINIO_USE_SSL: false

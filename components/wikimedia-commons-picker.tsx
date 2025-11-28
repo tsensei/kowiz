@@ -199,9 +199,9 @@ export function WikimediaCommonsPicker({ onImportSuccess }: WikimediaCommonsPick
                 </Button>
             </DialogTrigger>
 
-            <DialogContent className="!w-[90vw] !max-w-[90vw] h-[80vh] flex flex-col">
-                <DialogHeader>
-                    <div className="flex items-center justify-between pr-10">
+            <DialogContent className="!w-[90vw] !max-w-[90vw] h-[80vh] flex flex-col p-6">
+                <DialogHeader className="pr-8">
+                    <div className="flex items-center justify-between">
                         <DialogTitle>Your Wikimedia Commons Uploads</DialogTitle>
                         <div className="flex gap-1 border rounded-lg p-1">
                             <Button
@@ -224,8 +224,8 @@ export function WikimediaCommonsPicker({ onImportSuccess }: WikimediaCommonsPick
                     </div>
                 </DialogHeader>
 
-                <div className="flex-1 overflow-hidden min-h-0 relative">
-                    <ScrollArea className="h-full pr-4">
+                <div className="flex-1 overflow-hidden min-h-0 relative -mr-2">
+                    <ScrollArea className="h-full pr-2">
                         {images.length === 0 && !loading ? (
                             <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
                                 <ImageIcon className="h-12 w-12 mb-4 opacity-20" />

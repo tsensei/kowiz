@@ -10,6 +10,8 @@ export type AuditAction =
   | 'file.retry'
   | 'file.import.url'
   | 'file.import.youtube'
+  | 'commons.upload'
+  | 'commons.generate_metadata'
   | 'user.login'
   | 'user.logout'
   | 'user.register'
