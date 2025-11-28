@@ -2,6 +2,7 @@
 
 import { FileDropzone } from '@/components/file-dropzone';
 import { UrlImport } from '@/components/url-import';
+import { WikimediaCommonsPicker } from '@/components/wikimedia-commons-picker';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { CheckCircle2, Clock, FileText, TrendingUp } from 'lucide-react';
@@ -16,18 +17,18 @@ export function UploadTab({ files, onUploadSuccess }: UploadTabProps) {
   // Calculate today's stats
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  
+
   const todayFiles = files.filter(f => new Date(f.createdAt) >= today);
   const todayCompleted = todayFiles.filter(f => f.status === 'completed');
-  
+
   const avgConversionTime = todayCompleted.length > 0
     ? todayCompleted.reduce((acc, f) => {
-        if (f.convertedAt && f.createdAt) {
-          const diff = new Date(f.convertedAt).getTime() - new Date(f.createdAt).getTime();
-          return acc + diff / 1000;
-        }
-        return acc;
-      }, 0) / todayCompleted.length
+      if (f.convertedAt && f.createdAt) {
+        const diff = new Date(f.convertedAt).getTime() - new Date(f.createdAt).getTime();
+        return acc + diff / 1000;
+      }
+      return acc;
+    }, 0) / todayCompleted.length
     : 0;
 
   // Get recent uploads (last 5)
@@ -54,8 +55,14 @@ export function UploadTab({ files, onUploadSuccess }: UploadTabProps) {
         </div>
       </div>
 
-      {/* URL Import */}
-      <UrlImport onImportSuccess={onUploadSuccess} />
+      {/* Import Options Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* URL Import */}
+        <UrlImport onImportSuccess={onUploadSuccess} />
+
+        {/* Wikimedia Commons Picker */}
+        <WikimediaCommonsPicker onImportSuccess={onUploadSuccess} />
+      </div>
 
       {/* Quick Stats */}
       <div>
@@ -131,11 +138,10 @@ export function UploadTab({ files, onUploadSuccess }: UploadTabProps) {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div className={`p-2 rounded-lg ${
-                        file.status === 'completed' ? 'bg-green-100 dark:bg-green-900' :
+                      <div className={`p-2 rounded-lg ${file.status === 'completed' ? 'bg-green-100 dark:bg-green-900' :
                         file.status === 'failed' ? 'bg-red-100 dark:bg-red-900' :
-                        'bg-blue-100 dark:bg-blue-900'
-                      }`}>
+                          'bg-blue-100 dark:bg-blue-900'
+                        }`}>
                         {file.category === 'image' && '📸'}
                         {file.category === 'video' && '🎥'}
                         {file.category === 'audio' && '🎵'}
