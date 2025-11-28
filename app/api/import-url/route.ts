@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     const userId = session.user.id;
 
     const body = await request.json();
-    const { url } = body;
+    const { url, filename, size } = body;
 
     if (!url) {
       return NextResponse.json({ error: 'URL is required' }, { status: 400 });
@@ -29,10 +29,10 @@ export async function POST(request: NextRequest) {
 
     // Validate URL
     const validation = urlValidationService.validateUrl(url);
-    
+
     if (!validation.isValid) {
-      return NextResponse.json({ 
-        error: validation.error || 'Invalid URL' 
+      return NextResponse.json({
+        error: validation.error || 'Invalid URL'
       }, { status: 400 });
     }
 
@@ -41,27 +41,54 @@ export async function POST(request: NextRequest) {
     // Generate unique file ID
     const fileId = uuidv4();
     const sanitizedUrl = urlValidationService.sanitizeUrl(url);
-    
+
     // Determine source type
     const importSource = validation.type === 'youtube' ? 'youtube' : 'direct_url';
-    
-    // Create a placeholder filename (will be updated after download)
-    const placeholderName = validation.metadata?.videoId 
-      ? `youtube-${validation.metadata.videoId}.mp4`
-      : `import-${fileId}.mp4`;
-    
-    const rawFileName = `${fileId}-${placeholderName}`;
+
+    // Determine file details
+    let finalName = filename;
+    let mimeType = 'video/mp4'; // Default fallback
+    let category = 'video';
+    let originalFormat = 'mp4';
+    let targetFormat = 'webm';
+
+    if (filename) {
+      // Infer from provided filename
+      const ext = filename.split('.').pop()?.toLowerCase();
+      if (ext) {
+        originalFormat = ext;
+        if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'tiff', 'tif'].includes(ext)) {
+          mimeType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+          category = 'image';
+          targetFormat = 'webp'; // Convert images to WebP
+        } else if (['mp3', 'wav', 'ogg', 'm4a'].includes(ext)) {
+          mimeType = `audio/${ext}`;
+          category = 'audio';
+          targetFormat = 'mp3';
+        } else {
+          // Keep video defaults
+          mimeType = `video/${ext}`;
+        }
+      }
+    } else if (validation.metadata?.videoId) {
+      // YouTube defaults
+      finalName = `youtube-${validation.metadata.videoId}.mp4`;
+    } else {
+      // Fallback
+      finalName = `import-${fileId}.mp4`;
+    }
+
+    const rawFileName = `${fileId}-${finalName}`;
 
     // Create database record
-    // Note: size and format will be updated after download
     const dbFile = await databaseService.createFile({
       userId,
-      name: placeholderName,
-      size: 0, // Will be updated after download
-      mimeType: 'video/mp4', // Default, will be updated
-      category: 'video', // Assume video for URL imports
-      originalFormat: 'mp4', // Will be updated after download
-      targetFormat: 'webm', // Convert to WebM for Commons
+      name: finalName,
+      size: size || 0, // Use provided size or default to 0
+      mimeType,
+      category: category as any,
+      originalFormat,
+      targetFormat,
       needsConversion: 'true',
       rawFilePath: rawFileName,
       importSource,
@@ -72,14 +99,14 @@ export async function POST(request: NextRequest) {
     // Add to conversion queue (worker will download first)
     await queueService.addConversionJob({
       fileId: dbFile.id,
-      fileName: placeholderName,
-      mimeType: 'video/mp4',
+      fileName: finalName,
+      mimeType,
     });
 
     // Update status to queued
     await databaseService.updateFileStatus(dbFile.id, 'queued');
 
-    console.log(`✓ URL import queued: ${placeholderName}`);
+    console.log(`✓ URL import queued: ${finalName}`);
 
     // Log import audit event
     await logAudit({
@@ -102,7 +129,7 @@ export async function POST(request: NextRequest) {
       success: true,
       file: {
         id: dbFile.id,
-        name: placeholderName,
+        name: finalName,
         importSource,
         sourceUrl: sanitizedUrl,
         status: 'queued',
