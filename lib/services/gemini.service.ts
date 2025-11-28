@@ -11,7 +11,7 @@ const metadataSchema = z.object({
 export type AIGeneratedMetadata = z.infer<typeof metadataSchema>;
 
 export class GeminiService {
-  private client: GoogleGenAI;
+  private client!: GoogleGenAI;
   private enabled: boolean;
 
   constructor() {
