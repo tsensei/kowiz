@@ -189,7 +189,7 @@ export function WikimediaCommonsPicker({ onImportSuccess }: WikimediaCommonsPick
                 <Button variant="outline" className="w-full h-auto py-8 border-dashed border-2 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20">
                     <div className="flex flex-col items-center gap-2">
                         <div className="p-3 bg-blue-100 dark:bg-blue-900 rounded-full">
-                            <ImageIcon className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                            <img src="/Commons-logo.svg" alt="Wikimedia Commons" className="h-6 w-6" />
                         </div>
                         <div className="text-center">
                             <span className="font-semibold block">Select from Wikimedia Commons</span>
