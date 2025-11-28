@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import Uppy from '@uppy/core';
 import Tus from '@uppy/tus';
@@ -34,6 +35,7 @@ export function FileDropzone({ onUploadSuccess }: FileDropzoneProps) {
   const { profile, loading: profileLoading, refresh: refreshProfile } = useUserProfile();
   const [uploading, setUploading] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [selectedFormats, setSelectedFormats] = useState<Record<number, string>>({}); // index -> targetFormat
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadedBytes, setUploadedBytes] = useState(0);
   const [totalBytes, setTotalBytes] = useState(0);
@@ -153,6 +155,7 @@ export function FileDropzone({ onUploadSuccess }: FileDropzoneProps) {
       // Clear files from Uppy and our state
       uppy.cancelAll();
       setSelectedFiles([]);
+      setSelectedFormats({});
 
       if (successful > 0) {
         onUploadSuccess();
@@ -228,13 +231,14 @@ export function FileDropzone({ onUploadSuccess }: FileDropzoneProps) {
 
     try {
       // Add files to Uppy
-      selectedFiles.forEach((file) => {
+      selectedFiles.forEach((file, index) => {
         uppy.addFile({
           name: file.name,
           type: file.type,
           data: file,
           meta: {
             notifyOnComplete: (notifyOnComplete && notificationsAvailable) ? 'true' : 'false',
+            targetFormat: selectedFormats[index] || 'auto',
           },
         });
       });
@@ -254,6 +258,38 @@ export function FileDropzone({ onUploadSuccess }: FileDropzoneProps) {
     if (file.type.startsWith('video/')) return <FileVideo className="h-5 w-5" />;
     if (file.type.startsWith('audio/')) return <FileAudio className="h-5 w-5" />;
     return <FileIcon className="h-5 w-5" />;
+  };
+
+  const getExportOptions = (file: File): { value: string; label: string }[] => {
+    const mimeType = file.type || '';
+    const extension = file.name.split('.').pop()?.toLowerCase();
+
+    if (mimeType.startsWith('image/') || extension?.match(/^(heic|heif|cr2|cr3|nef|arw|dng|rw2|orf|raf)$/)) {
+      return [
+        { value: 'auto', label: 'Auto (Recommended)' },
+        { value: 'jpeg', label: 'JPEG' },
+        { value: 'png', label: 'PNG' },
+        { value: 'gif', label: 'GIF' },
+        { value: 'svg', label: 'SVG' },
+        { value: 'tiff', label: 'TIFF' },
+        { value: 'xcf', label: 'XCF (GIMP)' },
+      ];
+    } else if (mimeType.startsWith('video/')) {
+      return [
+        { value: 'auto', label: 'Auto (Recommended)' },
+        { value: 'webm', label: 'WebM (VP9)' },
+      ];
+    } else if (mimeType.startsWith('audio/')) {
+      return [
+        { value: 'auto', label: 'Auto (Recommended)' },
+        { value: 'ogg', label: 'OGG Vorbis' },
+        { value: 'opus', label: 'Opus' },
+        { value: 'flac', label: 'FLAC (Lossless)' },
+        { value: 'wav', label: 'WAV (Uncompressed)' },
+      ];
+    }
+
+    return [{ value: 'auto', label: 'Auto (Recommended)' }];
   };
 
   return (
@@ -382,6 +418,24 @@ export function FileDropzone({ onUploadSuccess }: FileDropzoneProps) {
                     {(file.size / 1024).toFixed(2)} KB
                   </p>
                 </div>
+                <Select
+                  value={selectedFormats[index] || 'auto'}
+                  onValueChange={(value) => {
+                    setSelectedFormats((prev) => ({ ...prev, [index]: value }));
+                  }}
+                  disabled={uploading}
+                >
+                  <SelectTrigger className="w-36">
+                    <SelectValue placeholder="Format" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {getExportOptions(file).map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <Button
                   variant="ghost"
                   size="sm"

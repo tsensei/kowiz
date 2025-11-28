@@ -181,6 +181,9 @@ export function FileCard({ file, onRetry }: FileCardProps) {
               <span className="font-medium uppercase text-primary">
                 {file.targetFormat}
               </span>
+              <span className="text-xs text-muted-foreground ml-2">
+                (Highest Quality)
+              </span>
               {file.convertedSize && (
                 <span className="text-muted-foreground ml-auto">
                   {formatSize(file.convertedSize)}
@@ -189,7 +192,18 @@ export function FileCard({ file, onRetry }: FileCardProps) {
             </div>
           )}
 
-          {!needsConversion && (
+          {!needsConversion && file.targetFormat && (
+            <div className="flex items-center gap-2 text-sm bg-muted/50 rounded-md p-2">
+              <span className="font-medium uppercase text-primary">
+                {file.originalFormat}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                (Already in {file.targetFormat.toUpperCase()} format)
+              </span>
+            </div>
+          )}
+
+          {!needsConversion && !file.targetFormat && (
             <div className="text-sm text-green-600 bg-green-50 dark:bg-green-950/20 rounded-md p-2">
               ✓ Commons-compatible format • No conversion needed
             </div>

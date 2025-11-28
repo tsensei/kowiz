@@ -8,6 +8,21 @@ export interface FormatInfo {
   isSupported: boolean;
 }
 
+export interface AvailableFormats {
+  category: MediaCategory;
+  inputFormat: string;
+  supportedOutputs: string[];
+  recommendedOutput: string;
+}
+
+// Available export formats for each category
+const EXPORT_FORMATS: Record<MediaCategory, string[]> = {
+  image: ['jpeg', 'png', 'gif', 'svg', 'tiff', 'xcf'],
+  video: ['webm'],
+  audio: ['ogg', 'opus', 'flac', 'wav'],
+  raw: ['jpeg', 'png', 'tiff'], // RAW can export to these
+};
+
 // Wikimedia Commons supported formats
 const SUPPORTED_FORMATS: Record<MediaCategory, string[]> = {
   image: ['jpg', 'jpeg', 'png', 'svg', 'gif', 'tif', 'tiff', 'xcf', 'pdf', 'djvu'],
@@ -151,6 +166,57 @@ export class FormatDetectionService {
   }
 
   /**
+   * Get available export formats for a file
+   */
+  getAvailableExportFormats(fileName: string, mimeType: string): AvailableFormats {
+    const extension = this.getExtension(fileName);
+    const category = this.detectCategory(extension, mimeType);
+    const supportedOutputs = EXPORT_FORMATS[category] || [];
+    const recommendedOutput = this.getDefaultTarget(category);
+
+    return {
+      category,
+      inputFormat: extension,
+      supportedOutputs,
+      recommendedOutput,
+    };
+  }
+
+  /**
+   * Detect format with optional user-specified target format
+   */
+  detectFormatWithTarget(
+    fileName: string,
+    mimeType: string,
+    userTargetFormat?: string
+  ): FormatInfo {
+    const extension = this.getExtension(fileName);
+    const category = this.detectCategory(extension, mimeType);
+
+    // If user specified a target format, use it
+    if (userTargetFormat && userTargetFormat !== 'auto') {
+      const availableFormats = EXPORT_FORMATS[category] || [];
+
+      // Validate user selection is supported for this category
+      if (availableFormats.includes(userTargetFormat)) {
+        // Check if conversion is needed
+        const needsConversion = extension !== userTargetFormat;
+
+        return {
+          category,
+          originalFormat: extension,
+          targetFormat: userTargetFormat,
+          needsConversion,
+          isSupported: this.isFormatSupported(userTargetFormat, category),
+        };
+      }
+    }
+
+    // Fall back to default detection logic
+    return this.detectFormat(fileName, mimeType);
+  }
+
+  /**
    * Get human-readable format name
    */
   getFormatName(format: string): string {
@@ -160,7 +226,13 @@ export class FormatDetectionService {
       png: 'PNG',
       webm: 'WebM',
       ogg: 'Ogg Vorbis',
+      opus: 'Opus',
+      flac: 'FLAC',
+      wav: 'WAV',
       tiff: 'TIFF',
+      gif: 'GIF',
+      svg: 'SVG',
+      xcf: 'XCF (GIMP)',
       heic: 'HEIC',
       heif: 'HEIF',
       mp4: 'MP4',

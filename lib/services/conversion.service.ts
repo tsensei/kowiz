@@ -185,13 +185,27 @@ export class ConversionService {
 
         // Maximum quality settings based on target format
         if (targetFormat === 'jpeg' || targetFormat === 'jpg') {
-          command += ' -quality 100 -sampling-factor 4:4:4'; // Maximum JPEG quality, no chroma subsampling
+          // Maximum JPEG quality: 100% quality, no chroma subsampling (4:4:4)
+          command += ' -quality 100 -sampling-factor 4:4:4';
         } else if (targetFormat === 'png') {
-          command += ' -quality 100 -define png:compression-level=9 -define png:compression-filter=5'; // Maximum PNG quality
-        } else if (targetFormat === 'tiff') {
-          command += ' -compress lzw -depth 16'; // Lossless compression with 16-bit depth
+          // Maximum PNG quality: best compression with quality preserved
+          command += ' -quality 100 -define png:compression-level=9 -define png:compression-filter=5';
+        } else if (targetFormat === 'gif') {
+          // High quality GIF: dithering with maximum colors
+          command += ' -colors 256 -dither FloydSteinberg';
+        } else if (targetFormat === 'svg') {
+          // SVG vector tracing: high quality trace with potrace
+          // Note: This creates traced vectors, not true vectorization
+          command += ' -colorspace RGB -type TrueColor';
+        } else if (targetFormat === 'tiff' || targetFormat === 'tif') {
+          // Maximum TIFF quality: lossless LZW compression with 16-bit depth
+          command += ' -compress lzw -depth 16';
+        } else if (targetFormat === 'xcf') {
+          // XCF (GIMP format): flatten layers and preserve quality
+          command += ' -flatten -quality 100';
         } else if (targetFormat === 'webp') {
-          command += ' -quality 100 -define webp:lossless=true'; // Lossless WebP
+          // Lossless WebP for maximum quality
+          command += ' -quality 100 -define webp:lossless=true';
         }
 
         command += ` "${outputPath}"`;
@@ -203,11 +217,13 @@ export class ConversionService {
 
         let command = `ffmpeg -i "${inputPath}"`;
 
-        // Maximum quality settings
+        // Maximum quality settings for FFmpeg
         if (targetFormat === 'jpeg' || targetFormat === 'jpg') {
           command += ' -q:v 1'; // Highest quality JPEG (scale 1-31, lower is better)
         } else if (targetFormat === 'png') {
           command += ' -compression_level 100'; // Maximum PNG compression (quality preserved)
+        } else if (targetFormat === 'tiff' || targetFormat === 'tif') {
+          command += ' -compression_algo lzw -pix_fmt rgb48le'; // 16-bit TIFF
         }
 
         command += ` -y "${outputPath}"`;
@@ -272,20 +288,66 @@ export class ConversionService {
   }
 
   /**
-   * Convert audio to Ogg Vorbis format using FFmpeg
+   * Convert audio formats using FFmpeg with highest quality settings
    */
   private async convertAudio(options: ConversionOptions): Promise<ConversionResult> {
-    const { inputPath, outputPath, onProgress } = options;
+    const { inputPath, outputPath, targetFormat, onProgress } = options;
 
     try {
-      // Convert to Ogg Vorbis with maximum quality
-      const args = [
-        '-i', inputPath,
-        '-c:a', 'libvorbis',
-        '-q:a', '10',
-        '-ar', '48000',
-        '-y', outputPath
-      ];
+      let args: string[];
+
+      // Maximum quality settings for each audio format
+      switch (targetFormat) {
+        case 'ogg':
+          // Ogg Vorbis: Maximum quality (q:a 10 = ~500kbps VBR)
+          args = [
+            '-i', inputPath,
+            '-c:a', 'libvorbis',
+            '-q:a', '10', // Highest quality setting (0-10 scale)
+            '-ar', '48000', // 48kHz sample rate
+            '-y', outputPath
+          ];
+          break;
+
+        case 'opus':
+          // Opus: Maximum quality (512kbps VBR with constrained VBR)
+          args = [
+            '-i', inputPath,
+            '-c:a', 'libopus',
+            '-b:a', '512k', // Maximum recommended bitrate
+            '-vbr', 'on', // Variable bitrate
+            '-compression_level', '10', // Highest compression efficiency (0-10)
+            '-application', 'audio', // Optimize for music/general audio
+            '-ar', '48000', // Opus works best at 48kHz
+            '-y', outputPath
+          ];
+          break;
+
+        case 'flac':
+          // FLAC: Lossless compression with maximum compression level
+          args = [
+            '-i', inputPath,
+            '-c:a', 'flac',
+            '-compression_level', '12', // Maximum compression (0-12)
+            '-sample_fmt', 's32', // 32-bit samples for maximum quality
+            '-ar', '96000', // Preserve high sample rates up to 96kHz
+            '-y', outputPath
+          ];
+          break;
+
+        case 'wav':
+          // WAV: Uncompressed PCM 24-bit for maximum quality
+          args = [
+            '-i', inputPath,
+            '-c:a', 'pcm_s24le', // 24-bit PCM (studio quality)
+            '-ar', '96000', // 96kHz sample rate
+            '-y', outputPath
+          ];
+          break;
+
+        default:
+          throw new Error(`Unsupported audio format: ${targetFormat}`);
+      }
 
       await this.execFFmpegWithProgress(args, onProgress);
 

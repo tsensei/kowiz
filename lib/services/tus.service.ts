@@ -31,6 +31,7 @@ interface UploadMetadata {
   batchId?: string;
   notifyOnComplete?: string;
   userEmail?: string;
+  targetFormat?: string; // User-selected target format
 }
 
 // In-memory store for tracking batch uploads
@@ -62,8 +63,9 @@ export const tusServer = new Server({
     const batchId = metadata?.batchId;
     const notifyOnComplete = metadata?.notifyOnComplete === 'true';
     const userEmail = metadata?.userEmail;
+    const userTargetFormat = metadata?.targetFormat; // User-selected format
 
-    console.log('[TUS Service] Parsed metadata:', { userId, username, filename, mimeType, batchId, notifyOnComplete });
+    console.log('[TUS Service] Parsed metadata:', { userId, username, filename, mimeType, batchId, notifyOnComplete, userTargetFormat });
 
     if (!userId) {
       console.error('[TUS Service] No userId in metadata!');
@@ -80,8 +82,10 @@ export const tusServer = new Server({
       }
     }
 
-    // Detect format and conversion requirements
-    const formatInfo = formatDetectionService.detectFormat(filename, mimeType);
+    // Detect format and conversion requirements with optional user-specified target
+    const formatInfo = userTargetFormat && userTargetFormat !== 'auto'
+      ? formatDetectionService.detectFormatWithTarget(filename, mimeType, userTargetFormat)
+      : formatDetectionService.detectFormat(filename, mimeType);
 
     try {
       // Create database record
