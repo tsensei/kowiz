@@ -4,64 +4,110 @@ Automatic media conversion system for Wikimedia Commons. Upload any media file a
 
 ## ✨ Features
 
+### Core Functionality
 - **🔐 Wikimedia OAuth2** - Secure authentication with Wikimedia accounts
 - **👤 User Isolation** - Each user sees only their own files and conversions
 - **🎯 Smart Format Detection** - Automatically detects and categorizes media files (image/video/audio/RAW)
 - **🔄 Auto Conversion** - Converts unsupported formats to Commons-compatible formats using FFmpeg and ImageMagick
-- **📤 Drag & Drop Upload** - Modern upload interface with multi-file and folder support
-- **🔗 URL Import** - Import videos from YouTube, Vimeo, or direct links using yt-dlp
 - **⚡ Background Processing** - pg-boss queue system with PostgreSQL backend
 - **📊 Real-time Monitoring** - Live progress tracking with auto-refresh
 - **💾 Dual Storage** - Preserves original files and stores converted versions in MinIO
 - **🔁 Automatic Retry** - Failed conversions retry up to 3 times automatically
-- **📱 Responsive Design** - Clean, spacious UI with tab-based navigation
 - **🛡️ Atomic Operations** - Automatic rollback on failures, no orphaned records
 
-## 🎯 Supported Conversions
+### Upload & Import
+- **📤 Drag & Drop Upload** - Modern upload interface with multi-file and folder support
+- **🔄 Resumable Uploads** - TUS protocol support for large file uploads with pause/resume capability
+- **🔗 URL Import** - Import videos from YouTube, Vimeo, or direct links using yt-dlp
+- **📁 Bulk Upload** - Upload entire folders with automatic recursive file discovery
+- **📈 Real-time Progress** - FFmpeg integration shows actual conversion progress during processing
+
+### Media Editing & Enhancement
+- **🖼️ Image Editor** - Built-in image editing with Filerobot Image Editor (crop, rotate, filters, annotations)
+- **🎵 Audio Editor** - Integrated Audiomass for audio editing and effects
+- **🎛️ Export Format Selection** - User-selectable export formats with highest quality conversion settings
+- **⚙️ Quality Control** - Configurable conversion quality settings for optimal file size/quality balance
+
+### Wikimedia Commons Integration
+- **🌍 Direct Publishing** - Upload converted files directly to Wikimedia Commons
+- **🤖 AI-Assisted Metadata** - AI-powered title, description, and category suggestions for Commons uploads
+- **📝 Rich Metadata Editor** - Complete metadata support including licenses, categories, dates, and descriptions
+- **📷 EXIF Data Extraction** - Automatic extraction of photo dates and metadata from image files
+- **🎨 Batch Publishing** - Publish multiple files with shared or individual metadata
+- **🔒 License Management** - Support for Creative Commons licenses (CC0, CC-BY, CC-BY-SA) and custom licenses
+
+### User Experience
+- **📱 Responsive Design** - Clean, spacious UI with tab-based navigation
+- **🎬 Interactive Tutorials** - Step-by-step wizards for complex workflows
+- **🔔 Smart Notifications** - Optional email notifications when conversions complete
+- **📊 Usage Analytics** - Track conversion history and user statistics
+- **🎨 Modern UI** - Built with shadcn/ui components and Tailwind CSS
+
+## 🎯 Supported Formats & Conversions
+
+KOWiz supports **user-selectable export formats** - choose your preferred output format for each file!
 
 ### Images
-- **HEIC/HEIF → JPEG** (Apple Photos format)
-- **WebP → JPEG** (Modern web format)
-- **BMP → JPEG** (Legacy bitmap)
+**Input Formats:** HEIC, HEIF, WebP, BMP, TGA, RAW formats, plus all Commons-supported formats
+**Export Options:**
+- **JPEG** - Best for photos, good compression
+- **PNG** - Lossless compression, transparency support
+- **GIF** - Simple animations, limited colors
+- **SVG** - Vector graphics, scalable
+- **TIFF** - High quality, large file size
+- **XCF (GIMP)** - GIMP project files
 
-### RAW Formats
-- **CR2/NEF/ARW/DNG/RW2 → TIFF** (Preserves quality)
-- Supports: Canon, Nikon, Sony, Adobe, Panasonic, Olympus, Fujifilm
+### RAW Camera Formats
+**Supported:** CR2, CR3, NEF, ARW, DNG, RW2, ORF, RAF
+**Export Options:** Same as images (recommended: TIFF for quality, JPEG for size)
+**Camera Support:** Canon, Nikon, Sony, Adobe, Panasonic, Olympus, Fujifilm
 
 ### Videos
-- **MP4/MOV/AVI/MKV → WebM** (VP9 + Opus codec)
-- Optimized for Wikimedia Commons requirements
-- Max resolution: 1920x1080, preserves aspect ratio
+**Input Formats:** MP4, MOV, AVI, MKV, HEVC, H.264, M4V, FLV, WMV
+**Export Options:**
+- **WebM (VP9)** - Wikimedia Commons standard, excellent compression
 
 ### Audio
-- **MP3/AAC/M4A → Ogg Vorbis** (Commons standard)
-- Quality level 6 (balanced quality/size)
+**Input Formats:** MP3, AAC, M4A, WMA, plus all Commons-supported formats
+**Export Options:**
+- **OGG Vorbis** - Wikimedia Commons standard, good compression
+- **Opus** - Modern codec, better compression than OGG
+- **FLAC** - Lossless compression, highest quality
+- **WAV** - Uncompressed, maximum compatibility
 
-### Already Supported (No Conversion)
-- **Images:** JPEG, PNG, GIF, SVG, TIFF
+### Already Commons-Supported (No Conversion Needed)
+- **Images:** JPEG, PNG, GIF, SVG, TIFF, XCF, PDF, DJVU
 - **Videos:** WebM, OGV
-- **Audio:** OGG, OPUS, WAV, FLAC
+- **Audio:** OGG, OGA, OPUS, WAV, FLAC, MIDI
+
+### Smart Auto-Detection
+Choose **"Auto (Recommended)"** and KOWiz will:
+- Pick the best format based on input type and quality
+- Preserve quality while ensuring Commons compatibility
+- Use optimal settings for file size and quality balance
 
 ## 🏗️ Architecture
 
 ```
 Frontend (Next.js 16)
     ↓
-API Routes (Upload, Files, Download, Retry)
+API Routes (Upload, Files, Download, Retry, Commons)
     ↓
 Services Layer
     ├── FormatDetectionService (Smart categorization)
     ├── ConversionService (FFmpeg/ImageMagick)
     ├── DatabaseService (PostgreSQL operations)
     ├── MinioService (Object storage)
-    └── QueueService (pg-boss jobs)
+    ├── QueueService (pg-boss jobs)
+    └── CommonsService (Wikimedia Commons integration)
     ↓
 Infrastructure
     ├── PostgreSQL (File metadata + Job queue)
     ├── MinIO (Raw & processed files)
-    └── FFmpeg/ImageMagick (Conversion engines)
+    ├── FFmpeg/ImageMagick (Conversion engines)
+    └── OpenAI API (AI metadata generation)
     ↓
-Worker (Background processing)
+Worker (Background processing with real-time progress)
 ```
 
 ## 🚀 Quick Start
@@ -117,10 +163,6 @@ MINIO_ACCESS_KEY=minioadmin
 MINIO_SECRET_KEY=minioadmin
 MINIO_USE_SSL=false
 
-# Redis
-REDIS_HOST=localhost
-REDIS_PORT=6379
-
 # NextAuth
 AUTH_SECRET=your-secret-here  # Generate with: openssl rand -base64 32
 NEXTAUTH_URL=http://localhost:3000
@@ -132,6 +174,9 @@ AUTH_WIKIMEDIA_SECRET=your-wikimedia-client-secret
 # Resend (email notifications)
 RESEND_API_KEY=your-resend-api-key
 RESEND_FROM_EMAIL=notification@kowiz.tsensei.dev
+
+# OpenAI (AI-assisted metadata generation)
+OPENAI_API_KEY=your-openai-api-key  # Optional, for AI features
 ```
 
 4. **Set up Wikimedia OAuth2:**
@@ -184,416 +229,72 @@ Click the "Sign in with Wikimedia" button and authorize the application.
 ## 🎬 Usage
 
 ### Upload Tab
-1. **File Upload:** Drag and drop files or click to browse
-2. **Folder Upload:** Click "Upload Folder" for bulk uploads
-3. **URL Import:** Paste YouTube or direct media URLs to import
-4. View quick stats and recently uploaded files
+1. **File Upload:** Drag and drop files or use the modern Uppy Dashboard for resumable uploads
+2. **Folder Upload:** Upload entire folders with recursive file discovery
+3. **URL Import:** Import media from YouTube, Vimeo, or direct URLs using yt-dlp
+4. **Resumable Uploads:** Large files support pause/resume with TUS protocol
+5. **Real-time Preview:** See file details and conversion requirements before upload
+6. **Notification Settings:** Opt-in to email notifications when conversions complete
 
 ### Queue Tab
-4. Monitor active conversions with real-time progress
-5. See queued files waiting for processing
-6. View and retry any failed conversions
+1. **Live Progress Tracking:** Monitor active conversions with real-time FFmpeg progress updates
+2. **Concurrent Processing:** Watch multiple files process simultaneously
+3. **Error Handling:** View detailed error messages and retry failed conversions
+4. **Progress Visualization:** Visual progress bars for conversion and upload stages
 
 ### Completed Tab
-7. Browse all successfully converted files
-8. Search and filter your files
-9. Download both original and converted versions
-
-## 📊 Database Schema
-
-```sql
-CREATE TABLE users (
-  id              UUID PRIMARY KEY,
-  wikimedia_id    VARCHAR(255) UNIQUE NOT NULL,
-  username        VARCHAR(255) NOT NULL,
-  email           VARCHAR(255),
-  name            VARCHAR(255),
-  created_at      TIMESTAMP DEFAULT NOW() NOT NULL,
-  updated_at      TIMESTAMP DEFAULT NOW() NOT NULL,
-  last_login_at   TIMESTAMP DEFAULT NOW() NOT NULL
-);
-
-CREATE TABLE files (
-  id                  UUID PRIMARY KEY,
-  user_id             UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  name                VARCHAR(255) NOT NULL,
-  size                BIGINT NOT NULL,
-  mime_type           VARCHAR(100) NOT NULL,
-  category            VARCHAR(50) NOT NULL,        -- image/video/audio/raw
-  original_format     VARCHAR(50) NOT NULL,        -- heic, mp4, mp3
-  target_format       VARCHAR(50),                 -- jpeg, webm, ogg
-  needs_conversion    VARCHAR(10) DEFAULT 'true',
-  converted_size      BIGINT,
-  import_source       VARCHAR(50) DEFAULT 'upload', -- upload/youtube/direct_url
-  source_url          TEXT,
-  raw_file_path       VARCHAR(500) NOT NULL,
-  processed_file_path VARCHAR(500),
-  status              VARCHAR(50) DEFAULT 'pending',
-  error_message       TEXT,
-  retry_count         BIGINT DEFAULT 0,
-  created_at          TIMESTAMP DEFAULT NOW(),
-  updated_at          TIMESTAMP DEFAULT NOW(),
-  converted_at        TIMESTAMP,
-  uploaded_at         TIMESTAMP
-);
-```
-
-## 🔧 Configuration
-
-### Environment Variables
-
-Create `.env.local`:
-
-```bash
-# Database
-DATABASE_HOST=localhost
-DATABASE_PORT=5432
-DATABASE_USER=postgres
-DATABASE_PASSWORD=postgres
-DATABASE_NAME=kowiz
-
-# MinIO
-MINIO_ENDPOINT=localhost
-MINIO_PORT=9000
-MINIO_ACCESS_KEY=minioadmin
-MINIO_SECRET_KEY=minioadmin
-MINIO_USE_SSL=false
-
-# Redis
-REDIS_HOST=localhost
-REDIS_PORT=6379
-
-# NextAuth
-AUTH_SECRET=your-secret-here
-NEXTAUTH_URL=http://localhost:3000
-
-# Wikimedia OAuth2
-AUTH_WIKIMEDIA_ID=your-wikimedia-client-id
-AUTH_WIKIMEDIA_SECRET=your-wikimedia-client-secret
-
-# Resend (email notifications)
-RESEND_API_KEY=your-resend-api-key
-RESEND_FROM_EMAIL=notification@kowiz.tsensei.dev
-```
-
-### Worker Concurrency
-
-Adjust in `worker.ts`:
-
-```typescript
-{ connection, concurrency: 2 } // 2-4 recommended based on CPU cores
-```
-
-### Conversion Quality
-
-Adjust in `lib/services/conversion.service.ts`:
-
-```typescript
-// Images
--quality 95  // 85-95 recommended
-
-// Videos
--crf 30      // 25-35 (lower = better quality, slower)
--b:v 2M      // 1M-4M bitrate
-```
-
-## 🛠️ Scripts
-
-```bash
-pnpm dev          # Start Next.js dev server
-pnpm build        # Build for production
-pnpm start        # Start production server
-pnpm worker       # Start background worker
-pnpm lint         # Run ESLint
-
-# Drizzle ORM
-pnpm drizzle-kit generate  # Generate migration
-pnpm drizzle-kit push      # Apply migration
-```
-
-## 🐳 Docker Services
-
-```bash
-# Start all services
-docker-compose up -d
-
-# Stop all services
-docker-compose down
-
-# View logs
-docker logs kowiz-postgres
-docker logs kowiz-minio
-docker logs kowiz-redis
-
-# Reset all data
-docker-compose down -v
-```
-
-### Service URLs
-
-- **Application:** http://localhost:3000
-- **MinIO Console:** http://localhost:9001 (minioadmin/minioadmin)
-- **PostgreSQL:** localhost:5432
-
-## 🔍 Monitoring
-
-### Check Queue Status
-
-```bash
-# Connect to PostgreSQL
-PGPASSWORD=postgres psql -h localhost -U postgres -d kowiz
-
-# Check waiting jobs
-SELECT COUNT(*) FROM pgboss.job WHERE name = 'file-conversion' AND state = 'created';
-
-# Check active jobs
-SELECT COUNT(*) FROM pgboss.job WHERE name = 'file-conversion' AND state = 'active';
-
-# Check completed
-SELECT COUNT(*) FROM pgboss.job WHERE name = 'file-conversion' AND state = 'completed';
-
-# Check failed
-SELECT COUNT(*) FROM pgboss.job WHERE name = 'file-conversion' AND state = 'failed';
-
-# View all job states
-SELECT state, COUNT(*) FROM pgboss.job WHERE name = 'file-conversion' GROUP BY state;
-```
-
-### Check Database
-
-```bash
-# Connect to PostgreSQL
-PGPASSWORD=postgres psql -h localhost -U postgres -d kowiz
-
-# View all files
-SELECT name, category, status FROM files;
-
-# Count by status
-SELECT status, COUNT(*) FROM files GROUP BY status;
-
-# View failed files
-SELECT name, error_message FROM files WHERE status = 'failed';
-```
-
-### Check Storage
-
-Open MinIO Console at http://localhost:9001 and check:
-- **raw-files** bucket - Original uploaded files
-- **processed-files** bucket - Converted files
-
-## 🛡️ Error Handling & Resilience
-
-### Automatic Rollback
-
-The upload process implements atomic-like behavior:
-
-1. **Database record created** → If MinIO fails: DB record deleted
-2. **File uploaded to MinIO** → If queue fails: MinIO file + DB record deleted
-3. **Job added to queue** → If status update fails: Continue (worker processes anyway)
-
-**Result:** No orphaned records or files
-
-### Retry Mechanism
-
-- **Automatic:** Up to 3 retry attempts with exponential backoff
-- **Manual:** Retry button in UI after automatic attempts exhausted
-- **Tracking:** Retry count stored in database
-
-### Recovery Utilities
-
-**Clean up orphaned records:**
-```bash
-curl -X POST http://localhost:3000/api/files/cleanup-orphaned
-```
-
-**Requeue pending files:**
-```bash
-curl -X POST http://localhost:3000/api/files/requeue-pending
-```
-
-## 📁 Project Structure
-
-```
-kowiz/
-├── app/
-│   ├── api/
-│   │   ├── auth/
-│   │   │   └── [...nextauth]/route.ts      # NextAuth handler
-│   │   ├── files/
-│   │   │   ├── route.ts                    # GET user's files
-│   │   │   ├── [id]/download/route.ts      # Download files
-│   │   │   ├── [id]/stream/route.ts        # Stream files
-│   │   │   ├── [id]/retry/route.ts         # Retry conversion
-│   │   │   ├── cleanup-orphaned/route.ts   # Cleanup utility
-│   │   │   └── requeue-pending/route.ts    # Requeue utility
-│   │   ├── upload/route.ts                 # Upload endpoint
-│   │   └── import-url/route.ts             # URL import endpoint
-│   ├── auth/
-│   │   ├── signin/page.tsx                 # Sign in page
-│   │   └── error/page.tsx                  # Auth error page
-│   ├── layout.tsx                          # Root layout with SessionProvider
-│   └── page.tsx                            # Main UI with tabs
-├── components/
-│   ├── auth/
-│   │   └── auth-button.tsx                 # Sign in/out button
-│   ├── providers/
-│   │   └── session-provider.tsx            # NextAuth session provider
-│   ├── ui/                                 # shadcn/ui components
-│   ├── upload-tab.tsx                      # Upload interface
-│   ├── queue-tab.tsx                       # Active monitoring
-│   ├── completed-tab.tsx                   # Download interface
-│   ├── file-dropzone.tsx                   # Drag-drop upload
-│   └── file-card.tsx                       # File status card
-├── lib/
-│   ├── auth.ts                             # NextAuth config
-│   ├── auth-utils.ts                       # Auth helper functions
-│   ├── db/
-│   │   ├── index.ts                        # Database connection
-│   │   ├── schema.ts                       # Drizzle schema (users + files)
-│   │   └── migrations/                     # Migration files
-│   └── services/
-│       ├── database.service.ts             # DB operations
-│       ├── minio.service.ts                # Object storage
-│       ├── queue.service.ts                # Job queue
-│       ├── format-detection.service.ts     # Format detection
-│       └── conversion.service.ts           # Media conversion
-├── types/
-│   └── next-auth.d.ts                      # NextAuth type definitions
-├── worker.ts                               # Background worker
-├── docker-compose.yml                      # Infrastructure
-├── drizzle.config.ts                       # ORM config
-└── package.json                            # Dependencies
-```
-
-## 🧪 Testing
-
-### Test Format Detection
-
-Upload files with different formats:
-- ✅ HEIC → Should convert to JPEG
-- ✅ MP4 → Should convert to WebM  
-- ✅ MP3 → Should convert to OGG
-- ✅ JPEG → Should skip conversion
-
-### Test Bulk Upload
-
-1. Click "Upload Folder"
-2. Select folder with 10+ mixed media files
-3. Watch concurrent processing (2 at a time)
-4. Verify all complete successfully
-
-### Test Error Recovery
-
-1. Stop worker
-2. Upload files (they'll queue)
-3. Restart worker
-4. Files should process automatically
-
-### Test Retry
-
-1. Upload a corrupt/invalid file
-2. Check Failed tab
-3. Click "Retry Conversion"
-4. Verify retry count increments
-
-## 🎯 Key Benefits of pg-boss
-
-- ✅ **Simpler Infrastructure** - One less Docker container (no Redis needed)
-- ✅ **Built-in Persistence** - Jobs survive crashes automatically
-- ✅ **Transactional Safety** - Queue operations can use PostgreSQL transactions
-- ✅ **Unified Backup** - One database backup includes everything
-- ✅ **SQL Monitoring** - Query jobs using standard SQL
-- ✅ **Lower Cost** - Fewer services to run and manage
-
-## 🚨 Troubleshooting
-
-### "No conversion needed" but file not supported
-
-The file is already in a Commons-supported format (JPEG, PNG, etc.). No conversion required.
-
-### Worker not processing files
-
-```bash
-# Check worker is running
-ps aux | grep tsx
-
-# Check Redis connection
-docker exec kowiz-redis redis-cli PING
-
-# Restart worker
-pnpm worker
-```
-
-### Files stuck in "pending" status
-
-```bash
-# Requeue pending files
-curl -X POST http://localhost:3000/api/files/requeue-pending
-```
-
-### "The specified key does not exist" error
-
-This means the database has records but files are missing from MinIO (orphaned records).
-
-```bash
-# Clean up orphaned records
-curl -X POST http://localhost:3000/api/files/cleanup-orphaned
-```
-
-### Jobs stuck in queue
-
-```bash
-# Check pg-boss jobs
-PGPASSWORD=postgres psql -h localhost -U postgres -d kowiz -c "SELECT * FROM pgboss.job WHERE state = 'failed' LIMIT 5;"
-
-# Retry failed jobs (will be picked up on next worker start)
-# Or use the UI retry button
-```
-
-### Docker network issues
-
-```bash
-docker network prune -f
-docker-compose down
-docker-compose up -d
-```
-
-### Reset everything
-
-```bash
-# Stop and remove all containers and volumes
-docker-compose down -v
-
-# Restart
-docker-compose up -d
-pnpm drizzle-kit push
-```
-
-## 📈 Performance
-
-### Typical Conversion Times
-
-| Type | Size | Time |
-|------|------|------|
-| HEIC → JPEG | 5 MB | 2-5s |
-| RAW → TIFF | 25 MB | 5-10s |
-| MP4 → WebM | 100 MB | 30-60s |
-| MP3 → OGG | 5 MB | 3-5s |
-
-### Optimization
-
-**Increase concurrency:**
-```typescript
-// worker.ts
-{ connection, concurrency: 4 }  // Based on CPU cores
-```
-
-**Reduce quality for faster processing:**
-```typescript
-// conversion.service.ts
--quality 85    // Instead of 95 for images
--crf 35        // Instead of 30 for videos
-```
+1. **File Management:** Browse, search, and filter all converted files
+2. **Media Editors:** Launch built-in image or audio editors for further enhancements
+3. **Download Options:** Download both original and converted versions
+4. **Commons Publishing:** Direct upload to Wikimedia Commons with AI-assisted metadata
+5. **Batch Operations:** Select multiple files for bulk publishing or downloads
+
+### Wikimedia Commons Integration
+1. **AI-Assisted Upload:** Use AI to generate titles, descriptions, and categories
+2. **EXIF Integration:** Automatic date extraction from image metadata
+3. **License Selection:** Choose from Creative Commons licenses or custom licenses
+4. **Batch Metadata:** Apply shared metadata to multiple uploads or customize individually
+5. **Preview & Review:** See exactly how your files will appear on Commons before publishing
+
+## 🤖 AI Features
+
+KOWiz integrates AI to streamline your Wikimedia Commons workflow:
+
+### AI-Assisted Metadata Generation
+- **Smart Title Generation**: Analyzes image content to create descriptive, searchable titles
+- **Detailed Descriptions**: AI examines visual elements to generate comprehensive descriptions
+- **Category Suggestions**: Suggests relevant Wikimedia Commons categories based on content analysis
+- **EXIF Integration**: Automatically extracts and incorporates photo dates from image metadata
+- **User Context Enhancement**: Combine AI analysis with your keywords for better results
+
+### AI Workflow
+1. **Upload**: Upload your media files as usual
+2. **Enable AI**: Toggle AI assistance in the Commons publish wizard
+3. **Provide Context**: Optionally add keywords or brief descriptions
+4. **AI Processing**: AI analyzes the media and generates metadata
+5. **Review & Edit**: Review AI suggestions and make any needed adjustments
+6. **Publish**: Upload to Commons with enhanced, AI-assisted metadata
+
+### Requirements
+- **OpenAI API Key**: Optional - AI features work without it, but provide enhanced results
+- **Image Analysis**: Works best with clear, high-quality images
+- **User Privacy**: AI only analyzes your uploaded files, no data is stored externally
+
+## 🎨 UI Components
+
+### Three Main Tabs
+
+1. **Upload** - Focused upload experience with stats and format selection
+2. **Queue** - Active monitoring of processing files with real-time progress
+3. **Completed** - Browse, edit, and publish converted files
+
+### Key Features
+- Drag & drop zone with format selection dropdowns
+- Resumable upload dashboard for large files
+- Real-time progress bars with FFmpeg integration
+- Built-in image and audio editors
+- Status filtering and search functionality
+- Batch operations for Commons publishing
 
 ## 🔐 Security & Authentication
 
@@ -624,6 +325,9 @@ KOWiz uses Wikimedia OAuth2 for secure user authentication:
 - shadcn/ui components
 - react-dropzone
 - @tanstack/react-table
+- @uppy/core & @uppy/tus (Resumable uploads)
+- react-filerobot-image-editor (Image editing)
+- Lucide React (Icons)
 
 **Backend:**
 - Next.js API Routes
@@ -632,92 +336,29 @@ KOWiz uses Wikimedia OAuth2 for secure user authentication:
 - PostgreSQL 16
 - MinIO (S3-compatible storage)
 - pg-boss (PostgreSQL-based queue)
+- Resend (Email notifications)
 
-**Conversion:**
-- FFmpeg 8.0
-- ImageMagick (optional)
+**Media Processing:**
+- FFmpeg 8.0 (Video/audio conversion)
+- ImageMagick (Image processing)
+- TUS Protocol (Resumable uploads)
+- yt-dlp (URL imports)
+
+**AI Integration:**
+- OpenAI API (Metadata generation)
+- EXIF data extraction
+- Computer vision analysis
+
+**Third-party Integrations:**
+- Wikimedia Commons API
+- YouTube/Vimeo APIs
+- Audiomass (Audio editing)
 
 **Infrastructure:**
 - Docker Compose
 - Node.js 20+
-
-## 📝 API Endpoints
-
-All endpoints require authentication via NextAuth.js session.
-
-### Authentication
-```typescript
-GET  /api/auth/signin              # Sign in page
-POST /api/auth/signout             # Sign out
-GET  /api/auth/session             # Get current session
-GET  /api/auth/callback/wikimedia  # OAuth callback
-```
-
-### Upload Files
-```typescript
-POST /api/upload
-Headers: Cookie with session
-Body: FormData with 'files' field (multiple files)
-Response: { success, results, totalFiles, successfulUploads, failedUploads }
-```
-
-### Import from URL
-```typescript
-POST /api/import-url
-Headers: Cookie with session
-Body: { url: string }
-Response: { success, file: { id, name, importSource, sourceUrl, status, type, platform } }
-```
-
-### Get User's Files
-```typescript
-GET /api/files
-Headers: Cookie with session
-Response: { files: File[] }  # Only returns current user's files
-```
-
-### Download File
-```typescript
-GET /api/files/[id]/download?type=raw|converted
-Headers: Cookie with session
-Response: File stream (verifies user ownership)
-```
-
-### Stream File
-```typescript
-GET /api/files/[id]/stream?type=raw|converted
-Headers: Cookie with session
-Response: File stream for inline viewing (verifies user ownership)
-```
-
-### Retry Conversion
-```typescript
-POST /api/files/[id]/retry
-Headers: Cookie with session
-Response: { success, message }
-```
-
-### Utilities
-```typescript
-POST /api/files/cleanup-orphaned    # Clean orphaned records
-POST /api/files/requeue-pending     # Requeue pending files
-```
-
-## 🎨 UI Components
-
-### Three Main Tabs
-
-1. **Upload** - Focused upload experience with stats
-2. **Queue** - Active monitoring of processing files
-3. **Completed** - Browse and download converted files
-
-### Key Features
-- Drag & drop zone
-- Folder upload support
-- Real-time progress bars
-- Status filtering
-- Search functionality
-- Download buttons
+- GitHub Actions (CI/CD)
+- Coolify (Deployment)
 
 ## 🚀 Production Deployment
 
